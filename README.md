@@ -1,49 +1,101 @@
-Here’s a clean, natural rewrite of your `README.md`—adapted for your **CodeCraft – Advanced Online Code Editor** project:
-
----
-
 ```markdown
 # 💻 CodeCraft — Advanced Online Code Editor
 
 Welcome to **CodeCraft**, a free and open-source web-based code editor built for modern developers.  
 It supports **HTML, CSS, JavaScript, PHP, and Python**, all inside your browser — no installation needed.
 
-## 📁 Project Structure
+## 🎨 Project Structure
 
 ```
+online_code_editor/
+├── src/
+│   ├── api/              # API integration
+│   ├── components/       # React components
+│   │   ├── ModernOutput.jsx       # Console and output panel
+│   │   ├── PreviewMode.jsx        # Live preview component
+│   │   ├── ProjectEditor.jsx      # Main editor component
+│   │   └── StackBlitzExplorer.jsx # File explorer
+│   ├── hooks/           # Custom React hooks
+│   ├── styles/          # CSS and styling
+│   ├── theme/           # Chakra UI theme configuration
+│   ├── utils/           # Utility functions
+│   │   ├── fileSystem.js  # Virtual file system
+│   │   └── storage.js     # Local storage management
+│   ├── App.jsx          # Main app component
+│   └── main.jsx         # App entry point
+├── public/              # Static assets
+├── package.json         # Dependencies and scripts
+└── vite.config.js      # Vite configuration
+```
 
-├── README.md              # Project documentation
-└── src/                   # Source files
-├── index.html         # Main HTML entry point
-├── styles.css         # Application styling
-├── script.js          # Frontend logic and interactions
-├── backend/           # Server-side logic (PHP + Python)
-└── assets/            # Images, icons, and static files
+### Core Features
+- **Monaco Editor Integration**: Full-featured code editor with IntelliSense, syntax highlighting, and auto-completion
+- **Multi-File Support**: Create and manage multiple files and folders in a project structure
+- **File Explorer**: VS Code-style file tree with drag-and-drop support
+- **Tab Management**: Work with multiple files simultaneously using tabs
+- **Auto-Save**: Automatic saving of files and project state to local storage
+- **Theme Support**: Light and dark mode themes
 
-````
+### Code Execution
+- **Real-Time Preview**: Live HTML/CSS/JS preview in an isolated iframe
+- **Console Output**: Integrated console for viewing JavaScript logs and errors
+- **Developer Tools**: Built-in developer tools with console, output, and terminal views
+- **Rocket Mode**: Turbo execution mode for faster code processing
 
-## 🚀 Key Features
+### File Management
+- **Project Templates**: Pre-built HTML and JavaScript project templates
+- **Import/Export**: Import existing projects or export your work
+- **File Operations**: Create, rename, delete files and folders
+- **Smart Language Detection**: Automatic programming language detection based on file extension
 
-- **Multi-Language Support** – Write and run HTML, CSS, JS, PHP, and Python
-- **Real-Time Output** – See live results as you type
-- **Clean Interface** – Minimal, distraction-free editor inspired by VS Code
-- **Syntax Highlighting** – Makes code easy to read and debug
-- **File System Simulation** – Create, open, and manage files in-browser
-- **Secure Execution** – Sandboxed environment to keep code safe
-- **Responsive Layout** – Works smoothly on desktop and mobile
-- **Open Source** – Free for learning, teaching, or building upon
+### Preview Modes
+- **Developer Tools Mode**: Bundle and preview code locally using blob URLs
+- **Console/Preview Toggle**: Switch between console output and live preview
+- **Responsive Preview**: Test your web apps in different device sizes
+- **Fullscreen Mode**: Distraction-free coding experience
+
+## 🛠️ Tech Stack
+
+- **Frontend Framework**: React 19+
+- **UI Library**: Chakra UI v2
+- **Code Editor**: Monaco Editor (VS Code's editor)
+- **Icons**: React Icons
+- **Animations**: Framer Motion
+- **Build Tool**: Vite
+- **Package Manager**: Yarn
+- **State Management**: React Hooks
+- **File System**: Custom virtual file system implementation
 
 ## 🛠️ Getting Started
 
-1. Clone the repository  
-   ```bash
-   git clone https://github.com/smshagor-dev/codecraft.git
-   cd codecraft
-````
+## 📦 Installation
 
-2. Open `src/index.html` in your browser to launch CodeCraft
-3. Edit `styles.css` or `script.js` to customize or extend features
-4. (Optional) Configure your backend for PHP and Python execution
+1. Clone the repository:
+```bash
+git clone https://github.com/smshagor-dev/codecraft.git
+cd online_code_editor
+```
+
+2. Install dependencies using Yarn:
+```bash
+yarn install
+```
+
+3. Start the development server:
+```bash
+yarn dev
+```
+
+4. Open your browser and navigate to:
+```
+http://localhost:5173
+```
+## 📝 Available Scripts
+
+- `yarn dev` - Start development server
+- `yarn build` - Build for production
+- `yarn preview` - Preview production build
+- `yarn lint` - Run ESLint
 
 ## 💡 Tips
 
@@ -52,12 +104,28 @@ It supports **HTML, CSS, JavaScript, PHP, and Python**, all inside your browser 
 * Extend backend execution using APIs for sandboxed environments
 * Save and share your projects directly from the browser
 
-## ⚙️ Technologies Used
+## 🎯 Usage
 
-* **Frontend:** HTML5, CSS3, Vanilla JavaScript
-* **Backend:** PHP, Python
-* **Design:** Flexbox, Grid, Glassmorphism, Animations
-* **Architecture:** Modular structure for clarity and scalability
+### Creating a New Project
+1. Click on the file explorer
+2. Right-click to create new files/folders
+3. Start coding in the editor
+
+### Loading Templates
+- Click "HTML Template" for a basic HTML/CSS/JS project
+- Click "JavaScript" for JavaScript snippets
+
+### Running Code
+- Click "Run Code" to execute JavaScript
+- Use "Preview" mode for HTML/CSS/JS projects
+- Toggle between Console and Preview views
+
+### Keyboard Shortcuts
+- `Ctrl/Cmd + S` - Save file (auto-save is enabled)
+- `Ctrl/Cmd + Enter` - Run code
+- `Ctrl/Cmd + /` - Toggle comment
+- `Ctrl/Cmd + F` - Find
+- `Ctrl/Cmd + H` - Replace
 
 ## 🎨 Customization Ideas
 
