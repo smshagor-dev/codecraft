@@ -1,0 +1,194 @@
+/* StackBlitz-style customizations */
+
+/* Prevent tooltip overflow */
+body {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.chakra-portal {
+  pointer-events: none;
+}
+
+.chakra-portal > * {
+  pointer-events: auto;
+}
+
+/* Allotment splitter styles */
+.allotment-module_splitView__L-yRc {
+  height: 100%;
+}
+
+.allotment-module_sashContainer__3rNYN {
+  background: transparent;
+}
+
+.allotment-module_sash__19Xv1 {
+  background: #d0d7de;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.allotment-module_sash__19Xv1:hover {
+  opacity: 1;
+  background: #0969da;
+}
+
+.allotment-module_sashActive__1n4Wq {
+  opacity: 1;
+  background: #0969da !important;
+}
+
+/* Dark mode splitter */
+[data-theme="dark"] .allotment-module_sash__19Xv1 {
+  background: #30363d;
+}
+
+[data-theme="dark"] .allotment-module_sash__19Xv1:hover {
+  background: #58a6ff;
+}
+
+[data-theme="dark"] .allotment-module_sashActive__1n4Wq {
+  background: #58a6ff !important;
+}
+
+/* Smooth transitions */
+.allotment-module_splitViewContainer__MGZ6O {
+  transition: none !important;
+}
+
+/* Loading spinner */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Pulse animation for rocket mode */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(249, 146, 38, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(249, 146, 38, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(249, 146, 38, 0);
+  }
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #0969da;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Dark mode scrollbar */
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: #161b22;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #30363d;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
+}
+
+/* File tabs */
+.file-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 100%;
+  cursor: pointer;
+  border-top: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.file-tab:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.file-tab.active {
+  background: white;
+  border-top-color: #0969da;
+}
+
+[data-theme="dark"] .file-tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .file-tab.active {
+  background: #0d1117;
+  border-top-color: #58a6ff;
+}
+
+/* Monaco Editor customizations */
+.monaco-editor {
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace !important;
+}
+
+.monaco-editor .margin-view-overlays .line-numbers {
+  color: #6e7681 !important;
+}
+
+/* Preview iframe */
+iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Console output */
+.console-entry {
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+.console-entry.error {
+  background: rgba(239, 68, 68, 0.1);
+  border-left: 3px solid #ef4444;
+}
+
+.console-entry.warn {
+  background: rgba(245, 158, 11, 0.1);
+  border-left: 3px solid #f59e0b;
+}
+
+.console-entry.info {
+  background: rgba(59, 130, 246, 0.1);
+  border-left: 3px solid #3b82f6;
+}
+
+.console-entry.log {
+  background: rgba(16, 185, 129, 0.1);
+  border-left: 3px solid #10b981;
+}
