@@ -309,7 +309,7 @@ console.log('🎉 Welcome to JavaScript!');
 
 // Variables and Data Types
 const name = 'CodeCraft';
-let version = 1.0.0;
+let version = 1.0;
 var isAwesome = true;
 
 // Array Operations
@@ -652,7 +652,7 @@ function App() {
               </Heading>
             </HStack>
             <Badge colorScheme="purple" variant="subtle">
-              v1.0.0
+              v1.0
             </Badge>
           </HStack>
 
