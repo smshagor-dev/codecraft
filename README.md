@@ -1,7 +1,7 @@
 ```markdown
-# 💻 CodeCraft — Advanced Online Code Editor
+# 💻 CoderPoint — Advanced Online Code Editor
 
-Welcome to **CodeCraft**, a free and open-source web-based code editor built for modern developers.  
+Welcome to **CoderPoint**, a free and open-source web-based code editor built for modern developers.  
 It supports **HTML, CSS, JavaScript, PHP, and Python**, all inside your browser — no installation needed.
 
 ## 🎨 Project Structure
@@ -72,7 +72,7 @@ online_code_editor/
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/smshagor-dev/codecraft.git
+git clone https://github.com/smshagor-dev/CoderPoint.git
 cd online_code_editor
 ```
 
@@ -138,20 +138,17 @@ http://localhost:5173
 ## 🧑‍💻 Contributing
 
 We welcome contributions!
-If you’d like to improve CodeCraft, submit a pull request or open an issue.
+If you’d like to improve CoderPoint, submit a pull request or open an issue.
 
 ## 📝 License
 
-**CodeCraft** is completely free and open-source.
+**CoderPoint** is completely free and open-source.
 You can use, modify, and distribute it for personal or commercial projects.
 
 ---
 
-Happy coding with **CodeCraft**! ⚡
+Happy coding with **CoderPoint**! ⚡
 
 ```
 
----
 
-Would you like me to make a **README version with badges and screenshots** (like GitHub-ready format with demo, installation, and preview sections)? It makes the project page look much more professional.
-```

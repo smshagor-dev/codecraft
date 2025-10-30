@@ -368,6 +368,8 @@ export const ProjectEditor = () => {
           editorRef={editorRef} 
           language={activeFile?.language || 'javascript'}
           fileSystem={fileSystem}
+          onFileSelect={handleFileSelect}
+          onFileSystemChange={handleFileSystemChange}
         />
       </Box>
       

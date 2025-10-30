@@ -43,8 +43,9 @@ import {
   FaCode
 } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
-import { executeCode } from "../api";
+import { executeCode, executeWebCode } from "../utils/compilerApis";
 import { PreviewMode } from "./PreviewMode";
+import { Terminal } from "./terminal";
 
 const MotionBox = motion(Box);
 
@@ -120,186 +121,7 @@ const LogEntry = ({ log, colorMode }) => {
   );
 };
 
-// Removed CODE_SNIPPETS - now handled by App.jsx
-/* const CODE_SNIPPETS = {
-  html: `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Awesome Page</title>
-    <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-        .container {
-            text-align: center;
-            padding: 2rem;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            backdrop-filter: blur(10px);
-        }
-        h1 {
-            margin-bottom: 1rem;
-            animation: fadeIn 1s ease-in;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🚀 Hello, World!</h1>
-        <p>Welcome to your awesome webpage!</p>
-        <button onclick="alert('Hello from HTML!')">Click Me!</button>
-    </div>
-</body>
-</html>`,
-  javascript: `// JavaScript Basic Example
-console.log('🎉 Welcome to JavaScript!');
-
-// Variables and Data Types
-const name = 'CodeCraft';
-let version = 1.0;
-var isAwesome = true;
-
-// Array Operations
-const languages = ['JavaScript', 'Python', 'Java', 'C++'];
-console.log('Supported languages:', languages);
-
-// Object Example
-const project = {
-    name: 'Online Code Editor',
-    features: ['Syntax Highlighting', 'Auto-completion', 'Live Preview'],
-    rating: 5
-};
-
-// Function Example
-function greetUser(userName) {
-    return \`Hello, \${userName}! Welcome to \${project.name}\`;
-}
-
-// Arrow Function
-const calculate = (a, b) => {
-    const sum = a + b;
-    const product = a * b;
-    return { sum, product };
-};
-
-// Using the functions
-console.log(greetUser('Developer'));
-console.log('Calculation Result:', calculate(10, 5));
-
-// Loop Example
-console.log('\\n📚 Available Features:');
-project.features.forEach((feature, index) => {
-    console.log(\`\${index + 1}. \${feature}\`);
-});
-
-// Promise Example
-const asyncOperation = new Promise((resolve) => {
-    setTimeout(() => {
-        resolve('✅ Async operation completed!');
-    }, 1000);
-});
-
-asyncOperation.then(result => console.log(result));`,
-  javascriptApp: `// Interactive JavaScript Application
-class TodoApp {
-    constructor() {
-        this.todos = [];
-        this.nextId = 1;
-        console.log('📝 Todo App Initialized');
-    }
-
-    addTodo(task) {
-        const todo = {
-            id: this.nextId++,
-            task: task,
-            completed: false,
-            createdAt: new Date().toISOString()
-        };
-        this.todos.push(todo);
-        console.log(\`✅ Added: "\${task}"\`);
-        return todo;
-    }
-
-    completeTodo(id) {
-        const todo = this.todos.find(t => t.id === id);
-        if (todo) {
-            todo.completed = true;
-            console.log(\`✓ Completed: "\${todo.task}"\`);
-        }
-    }
-
-    listTodos() {
-        console.log('\\n📋 Your Todo List:');
-        console.log('================');
-        
-        if (this.todos.length === 0) {
-            console.log('No todos yet. Add some tasks!');
-            return;
-        }
-
-        this.todos.forEach(todo => {
-            const status = todo.completed ? '✓' : '○';
-            const style = todo.completed ? '(completed)' : '(pending)';
-            console.log(\`\${status} [\${todo.id}] \${todo.task} \${style}\`);
-        });
-    }
-
-    getStats() {
-        const total = this.todos.length;
-        const completed = this.todos.filter(t => t.completed).length;
-        const pending = total - completed;
-        
-        console.log('\\n📊 Statistics:');
-        console.log(\`Total Tasks: \${total}\`);
-        console.log(\`Completed: \${completed}\`);
-        console.log(\`Pending: \${pending}\`);
-        
-        if (total > 0) {
-            const completionRate = ((completed / total) * 100).toFixed(1);
-            console.log(\`Completion Rate: \${completionRate}%\`);
-        }
-    }
-}
-
-// Demo the Todo App
-console.log('🚀 JavaScript Todo App Demo');
-console.log('===========================\\n');
-
-const app = new TodoApp();
-
-// Add some todos
-app.addTodo('Learn JavaScript');
-app.addTodo('Build awesome projects');
-app.addTodo('Master React');
-app.addTodo('Deploy to production');
-
-// Complete some tasks
-app.completeTodo(1);
-app.completeTodo(3);
-
-// Display the list
-app.listTodos();
-
-// Show statistics
-app.getStats();
-
-console.log('\\n💡 Try adding more todos or marking them complete!');`
-}; */
-
-export const ModernOutput = ({ editorRef, language, fileSystem }) => {
+export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, onFileSystemChange }) => {
   const { colorMode } = useColorMode();
   const toast = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -315,6 +137,17 @@ export const ModernOutput = ({ editorRef, language, fileSystem }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [isRocketMode, setIsRocketMode] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [compilerStatus, setCompilerStatus] = useState('ready');
+
+  // Create default handlers if not provided
+  const handleFileSelect = onFileSelect || (() => {
+    console.warn('onFileSelect not provided to ModernOutput');
+  });
+
+  const handleFileSystemChange = onFileSystemChange || (() => {
+    console.warn('onFileSystemChange not provided to ModernOutput');
+  });
 
   const parseOutput = (output, isError = false) => {
     const lines = output.split('\n').filter(line => line.trim());
@@ -348,6 +181,7 @@ export const ModernOutput = ({ editorRef, language, fileSystem }) => {
     
     setIsLoading(true);
     setError(null);
+    setCompilerStatus('connecting');
     const startTime = performance.now();
     
     // Show rocket mode notification
@@ -363,7 +197,16 @@ export const ModernOutput = ({ editorRef, language, fileSystem }) => {
     }
     
     try {
-      const { run: result } = await executeCode(language, sourceCode);
+      setCompilerStatus('executing');
+      let result;
+      
+      // Use appropriate executor based on language
+      if (['html', 'css', 'javascript', 'js', 'jsx', 'ts', 'tsx'].includes(language)) {
+        result = await executeWebCode(language, sourceCode, fileSystem);
+      } else {
+        result = await executeCode(language, sourceCode);
+      }
+      
       const endTime = performance.now();
       let executionTime = Math.round(endTime - startTime);
       
@@ -372,15 +215,17 @@ export const ModernOutput = ({ editorRef, language, fileSystem }) => {
         executionTime = Math.round(executionTime * 0.6); // 40% faster
       }
       
-      if (result.stderr) {
-        setError(result.stderr);
-        const errorLogs = parseOutput(result.stderr, true);
+      if (result.run.stderr) {
+        setError(result.run.stderr);
+        const errorLogs = parseOutput(result.run.stderr, true);
         setLogs(prev => [...prev, ...errorLogs]);
+        setCompilerStatus('error');
       } else {
-        const outputText = result.output || result.stdout || "";
+        const outputText = result.run.output || result.run.stdout || "";
         setOutput(outputText);
         const successLogs = parseOutput(outputText);
         setLogs(prev => [...prev, ...successLogs]);
+        setCompilerStatus('success');
         
         // Add turbo mode success message
         if (turboMode) {
@@ -398,7 +243,7 @@ export const ModernOutput = ({ editorRef, language, fileSystem }) => {
         executionTime,
         memoryUsage: turboMode ? Math.round(Math.random() * 30 + 5) : Math.round(Math.random() * 50 + 10),
         cpuUsage: turboMode ? Math.round(Math.random() * 20 + 3) : Math.round(Math.random() * 30 + 5),
-        successRate: result.stderr ? 0 : 100
+        successRate: result.run.stderr ? 0 : 100
       }));
       
     } catch (error) {
@@ -410,6 +255,17 @@ export const ModernOutput = ({ editorRef, language, fileSystem }) => {
         timestamp: new Date().toLocaleTimeString()
       }]);
       setMetrics(prev => ({ ...prev, successRate: 0 }));
+      setCompilerStatus('error');
+      
+      // Show specific error toast for compiler issues
+      toast({
+        title: "Compiler Error",
+        description: "Failed to execute code. Please try again.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+        position: "top-right"
+      });
     } finally {
       setIsLoading(false);
       if (turboMode && !error) {
@@ -437,6 +293,7 @@ export const ModernOutput = ({ editorRef, language, fileSystem }) => {
     setLogs([]);
     setOutput("");
     setError(null);
+    setCompilerStatus('ready');
   };
 
   const copyOutput = () => {
@@ -449,8 +306,6 @@ export const ModernOutput = ({ editorRef, language, fileSystem }) => {
       position: "top-right"
     });
   };
-
-  // Removed unused loadSnippet function - snippets are now loaded through App.jsx
 
   const downloadOutput = () => {
     const content = logs.map(log => `[${log.timestamp}] ${log.type.toUpperCase()}: ${log.message}`).join('\n');
@@ -469,6 +324,28 @@ export const ModernOutput = ({ editorRef, language, fileSystem }) => {
       node.name.endsWith('.html') || 
       (node.children && node.children.some(child => child.name.endsWith('.html')))
     );
+
+  // Get compiler status badge color
+  const getCompilerStatusColor = () => {
+    switch (compilerStatus) {
+      case 'connecting': return 'blue';
+      case 'executing': return 'yellow';
+      case 'success': return 'green';
+      case 'error': return 'red';
+      default: return 'gray';
+    }
+  };
+
+  // Get compiler status text
+  const getCompilerStatusText = () => {
+    switch (compilerStatus) {
+      case 'connecting': return 'Connecting to Compiler';
+      case 'executing': return 'Executing Code';
+      case 'success': return 'Execution Successful';
+      case 'error': return 'Execution Failed';
+      default: return 'Ready';
+    }
+  };
 
   // If preview mode is active and HTML files exist, show PreviewMode component
   if (showPreview && hasHTMLFile) {
@@ -525,13 +402,24 @@ export const ModernOutput = ({ editorRef, language, fileSystem }) => {
             <Text fontSize="sm" fontWeight="bold">
               Developer Console
             </Text>
-            <Badge
-              colorScheme={isLoading ? "yellow" : error ? "red" : "green"}
-              variant="subtle"
-              fontSize="xs"
-            >
-              {isLoading ? "Running" : error ? "Error" : "Ready"}
-            </Badge>
+            <HStack spacing={2}>
+              <Badge
+                colorScheme={getCompilerStatusColor()}
+                variant="subtle"
+                fontSize="xs"
+              >
+                {getCompilerStatusText()}
+              </Badge>
+              {language && (
+                <Badge
+                  colorScheme="purple"
+                  variant="solid"
+                  fontSize="xs"
+                >
+                  {language.toUpperCase()}
+                </Badge>
+              )}
+            </HStack>
           </VStack>
         </HStack>
 
@@ -805,35 +693,58 @@ export const ModernOutput = ({ editorRef, language, fileSystem }) => {
               </VStack>
             </TabPanel>
 
-            <TabPanel p={4}>
-              <Box
-                p={3}
-                bg={colorMode === 'dark' ? 'gray.900' : 'gray.100'}
-                borderRadius="md"
-                fontFamily="mono"
-                fontSize="sm"
-              >
-                <HStack mb={2}>
-                  <Text color="green.400">$</Text>
-                  <Text color={colorMode === 'dark' ? 'gray.300' : 'gray.700'}>
-                    node {language === 'javascript' ? 'index.js' : `main.${language}`}
-                  </Text>
-                </HStack>
-                {isLoading && (
-                  <HStack spacing={2}>
-                    <Spinner size="xs" color="purple.400" />
-                    <Text fontSize="xs" color={colorMode === 'dark' ? 'gray.400' : 'gray.600'}>
-                      Executing...
-                    </Text>
-                  </HStack>
-                )}
-              </Box>
+            {/* Terminal TabPanel */}
+            <TabPanel p={0} h="100%">
+              <Terminal
+                fileSystem={fileSystem}
+                onFileSelect={handleFileSelect}
+                onFileSystemChange={handleFileSystemChange}
+                isVisible={true}
+              />
             </TabPanel>
+            
           </TabPanels>
         </Tabs>
       </Box>
 
-     
+      {/* Loading Overlay */}
+      {isLoading && (
+        <MotionBox
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          position="absolute"
+          top={0}
+          left={0}
+          right={0}
+          bottom={0}
+          bg={colorMode === 'dark' ? 'rgba(0, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          zIndex={10}
+          backdropFilter="blur(4px)"
+        >
+          <VStack spacing={4}>
+            <Spinner
+              size="xl"
+              color="purple.500"
+              thickness="4px"
+              speed="0.65s"
+            />
+            <VStack spacing={1}>
+              <Text fontWeight="bold" fontSize="lg">
+                {compilerStatus === 'connecting' ? 'Connecting to Compiler...' : 'Executing Code...'}
+              </Text>
+              <Text fontSize="sm" color={colorMode === 'dark' ? 'gray.400' : 'gray.600'}>
+                {compilerStatus === 'connecting' 
+                  ? 'Establishing connection with cloud compiler...' 
+                  : 'Running your code on remote server...'}
+              </Text>
+            </VStack>
+          </VStack>
+        </MotionBox>
+      )}
     </MotionBox>
   );
 };

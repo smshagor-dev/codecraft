@@ -23,9 +23,9 @@ const CODE_TEMPLATES = {
       {
         type: 'file',
         name: 'README.md',
-        content: `# 💻 CodeCraft — Advanced Online Code Editor
+        content: `# 💻 CoderPoint — Advanced Online Code Editor
     
-    CodeCraft is a free, open-source, web-based code editor and IDE that runs in your browser.  
+    CoderPoint is a free, open-source, web-based code editor and IDE that runs in your browser.  
     Write and run **HTML, CSS, JavaScript, PHP, and Python** without installing anything.
     
     ## 📁 Project Structure
@@ -62,8 +62,8 @@ const CODE_TEMPLATES = {
     
     1. Clone the repo:
        \`\`\`bash
-       git clone https://github.com/smshagor-dev/codecraft.git
-       cd codecraft
+       git clone https://github.com/smshagor-dev/CoderPoint.git
+       cd CoderPoint
        \`\`\`
     2. Open the frontend:
        - Open \`src/index.html\` in your browser for the UI (dev mode).
@@ -93,7 +93,7 @@ const CODE_TEMPLATES = {
     
     ## 📝 License
     
-    CodeCraft is free and open-source. Use it, adapt it, and ship it under the license in this repo.
+    CoderPoint is free and open-source. Use it, adapt it, and ship it under the license in this repo.
     
     ---
     
@@ -110,7 +110,7 @@ const CODE_TEMPLATES = {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=2.0">
     <title>My Awesome Page</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -308,8 +308,8 @@ Happy coding! 🚀`
 console.log('🎉 Welcome to JavaScript!');
 
 // Variables and Data Types
-const name = 'CodeCraft';
-let version = 1.0;
+const name = 'CoderPoint';
+let version = 2.0;
 var isAwesome = true;
 
 // Array Operations
@@ -648,11 +648,11 @@ function App() {
             <HStack spacing={2}>
               <FaPlay color="#0969da" />
               <Heading size="md" bgGradient="linear(to-r, blue.400, purple.500)" bgClip="text">
-                CodeCraft
+                CoderPoint
               </Heading>
             </HStack>
             <Badge colorScheme="purple" variant="subtle">
-              v1.0
+              v2.0
             </Badge>
           </HStack>
 
@@ -663,7 +663,7 @@ function App() {
                 icon={<FaGithub />}
                 variant="ghost"
                 size="sm"
-                onClick={() => window.open("https://github.com/smshagor-dev/codecraft.git", "_blank")}
+                onClick={() => window.open("https://github.com/smshagor-dev/CoderPoint.git", "_blank")}
               />
             </Tooltip>
             <Tooltip label={`Switch to ${colorMode === "light" ? "dark" : "light"} mode`} placement="bottom">
