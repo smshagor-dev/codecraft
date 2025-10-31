@@ -21,7 +21,8 @@ import {
   Code,
   Grid,
   GridItem,
-  Spinner
+  Spinner,
+  useDisclosure
 } from "@chakra-ui/react";
 import { 
   FaPlay, 
@@ -43,9 +44,10 @@ import {
   FaCode
 } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
-import { executeCode, executeWebCode } from "../utils/compilerApis";
+import { executeCode, executeWebCode, analyzeInputRequirements } from "../utils/compilerApis";
 import { PreviewMode } from "./PreviewMode";
 import { Terminal } from "./terminal";
+import { InputModal } from "./InputModal";
 
 const MotionBox = motion(Box);
 
@@ -124,16 +126,23 @@ const LogEntry = ({ log, colorMode }) => {
 export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, onFileSystemChange }) => {
   const { colorMode } = useColorMode();
   const toast = useToast();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  
   const [isLoading, setIsLoading] = useState(false);
   const [output, setOutput] = useState("");
   const [logs, setLogs] = useState([]);
   const [error, setError] = useState(null);
+  const [userInput, setUserInput] = useState('');
+  const [inputFields, setInputFields] = useState([]);
+  const [pendingExecution, setPendingExecution] = useState(null);
+  
   const [metrics, setMetrics] = useState({
     executionTime: 0,
     memoryUsage: 0,
     cpuUsage: 0,
     successRate: 100
   });
+  
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [isRocketMode, setIsRocketMode] = useState(false);
@@ -150,11 +159,20 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
   });
 
   const parseOutput = (output, isError = false) => {
+    if (!output) return [];
+    
     const lines = output.split('\n').filter(line => line.trim());
     return lines.map((line, index) => {
       let type = isError ? 'error' : 'success';
+      
+      // Detect output types
       if (line.toLowerCase().includes('warning')) type = 'warning';
+      if (line.toLowerCase().includes('error')) type = 'error';
       if (line.toLowerCase().includes('info')) type = 'info';
+      if (line.toLowerCase().includes('success')) type = 'success';
+      if (line.toLowerCase().includes('executed using')) type = 'info';
+      if (line.toLowerCase().includes('turbo execution')) type = 'info';
+      if (line.toLowerCase().includes('used provided input')) type = 'info';
       
       return {
         id: Date.now() + index,
@@ -165,7 +183,16 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
     });
   };
 
-  const runCode = async (turboMode = false) => {
+  // Analyze input requirements when code changes
+  const analyzeCodeForInput = () => {
+    const sourceCode = editorRef.current?.getValue();
+    if (!sourceCode) return [];
+    
+    return analyzeInputRequirements(sourceCode, language);
+  };
+
+  // Handle run code with input modal logic
+  const handleRunCode = (turboMode = false) => {
     const sourceCode = editorRef.current?.getValue();
     if (!sourceCode) {
       toast({
@@ -178,6 +205,33 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
       });
       return;
     }
+
+    // Analyze input requirements for ALL languages
+    const detectedInputFields = analyzeCodeForInput();
+    
+    if (detectedInputFields.length > 0) {
+      // Show input modal
+      setInputFields(detectedInputFields);
+      setPendingExecution({ turboMode });
+      onOpen();
+    } else {
+      // No input required, run directly
+      executeCodeDirectly(turboMode, '');
+    }
+  };
+
+  // Handle execution with provided input
+  const handleExecuteWithInput = (input) => {
+    if (pendingExecution) {
+      executeCodeDirectly(pendingExecution.turboMode, input);
+      setPendingExecution(null);
+    }
+  };
+
+  // Main execution function
+  const executeCodeDirectly = async (turboMode = false, input = '') => {
+    const sourceCode = editorRef.current?.getValue();
+    if (!sourceCode) return;
     
     setIsLoading(true);
     setError(null);
@@ -204,7 +258,8 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
       if (['html', 'css', 'javascript', 'js', 'jsx', 'ts', 'tsx'].includes(language)) {
         result = await executeWebCode(language, sourceCode, fileSystem);
       } else {
-        result = await executeCode(language, sourceCode);
+        // For all other languages, pass the input to the compiler API
+        result = await executeCode(language, sourceCode, input);
       }
       
       const endTime = performance.now();
@@ -215,27 +270,62 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
         executionTime = Math.round(executionTime * 0.6); // 40% faster
       }
       
-      if (result.run.stderr) {
-        setError(result.run.stderr);
-        const errorLogs = parseOutput(result.run.stderr, true);
-        setLogs(prev => [...prev, ...errorLogs]);
-        setCompilerStatus('error');
+      // Handle API response properly
+      if (result.run) {
+        const { output, stdout, stderr } = result.run;
+        
+        // Combine output sources - prioritize stdout, then output
+        const finalOutput = stdout || output || '';
+        const finalError = stderr || '';
+        
+        if (finalError) {
+          setError(finalError);
+          const errorLogs = parseOutput(finalError, true);
+          setLogs(prev => [...prev, ...errorLogs]);
+          setCompilerStatus('error');
+        } else {
+          setOutput(finalOutput);
+          const successLogs = parseOutput(finalOutput);
+          setLogs(prev => [...prev, ...successLogs]);
+          setCompilerStatus('success');
+          
+          // Add API used information
+          setLogs(prev => [...prev, {
+            id: Date.now() + 999,
+            type: 'info',
+            message: `✅ Executed using ${result.apiUsed || 'unknown'} API`,
+            timestamp: new Date().toLocaleTimeString()
+          }]);
+          
+          // Add input info if used
+          if (input) {
+            setUserInput(input);
+            const inputLines = input.split('\n').filter(line => line.trim());
+            setLogs(prev => [...prev, {
+              id: Date.now() + 1001,
+              type: 'info',
+              message: `📥 Used ${inputLines.length} input${inputLines.length > 1 ? 's' : ''}: ${inputLines.map(line => `"${line}"`).join(', ')}`,
+              timestamp: new Date().toLocaleTimeString()
+            }]);
+          }
+          
+          // Add turbo mode success message
+          if (turboMode) {
+            setLogs(prev => [...prev, {
+              id: Date.now() + 1000,
+              type: 'info',
+              message: '⚡ Turbo execution completed successfully!',
+              timestamp: new Date().toLocaleTimeString()
+            }]);
+          }
+        }
       } else {
-        const outputText = result.run.output || result.run.stdout || "";
+        // Handle case where result structure is different
+        const outputText = result.output || JSON.stringify(result, null, 2);
         setOutput(outputText);
         const successLogs = parseOutput(outputText);
         setLogs(prev => [...prev, ...successLogs]);
         setCompilerStatus('success');
-        
-        // Add turbo mode success message
-        if (turboMode) {
-          setLogs(prev => [...prev, {
-            id: Date.now() + 999,
-            type: 'info',
-            message: '⚡ Turbo execution completed successfully!',
-            timestamp: new Date().toLocaleTimeString()
-          }]);
-        }
       }
       
       setMetrics(prev => ({
@@ -243,17 +333,37 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
         executionTime,
         memoryUsage: turboMode ? Math.round(Math.random() * 30 + 5) : Math.round(Math.random() * 50 + 10),
         cpuUsage: turboMode ? Math.round(Math.random() * 20 + 3) : Math.round(Math.random() * 30 + 5),
-        successRate: result.run.stderr ? 0 : 100
+        successRate: error ? 0 : 100
       }));
       
     } catch (error) {
-      setError(error.message || "Execution failed");
+      console.error('Execution error:', error);
+      const errorMessage = error.message || "Execution failed";
+      setError(errorMessage);
+      
+      // Add detailed error log
       setLogs(prev => [...prev, {
         id: Date.now(),
         type: 'error',
-        message: error.message || "Execution failed",
+        message: `API Error: ${errorMessage}`,
         timestamp: new Date().toLocaleTimeString()
       }]);
+      
+      // Check if it's a compiler API error with multiple failures
+      if (errorMessage.includes('All compilers failed')) {
+        const lines = errorMessage.split('\n').slice(1); // Skip the first line
+        lines.forEach(line => {
+          if (line.trim()) {
+            setLogs(prev => [...prev, {
+              id: Date.now() + Math.random(),
+              type: 'error',
+              message: `Compiler failed: ${line.trim()}`,
+              timestamp: new Date().toLocaleTimeString()
+            }]);
+          }
+        });
+      }
+      
       setMetrics(prev => ({ ...prev, successRate: 0 }));
       setCompilerStatus('error');
       
@@ -262,7 +372,7 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
         title: "Compiler Error",
         description: "Failed to execute code. Please try again.",
         status: "error",
-        duration: 3000,
+        duration: 5000,
         isClosable: true,
         position: "top-right"
       });
@@ -284,7 +394,7 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
   
   const runRocketMode = () => {
     setIsRocketMode(true);
-    runCode(true).finally(() => {
+    handleRunCode(true).finally(() => {
       setTimeout(() => setIsRocketMode(false), 2000);
     });
   };
@@ -293,6 +403,7 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
     setLogs([]);
     setOutput("");
     setError(null);
+    setUserInput('');
     setCompilerStatus('ready');
   };
 
@@ -317,6 +428,10 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  // Check input requirements for ALL languages
+  const inputFieldsCount = analyzeCodeForInput().length;
+  const hasInputRequirements = inputFieldsCount > 0;
 
   // Check if HTML files exist for preview functionality
   const hasHTMLFile = fileSystem && fileSystem.root && 
@@ -347,6 +462,27 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
     }
   };
 
+  // Get language-specific input information
+  const getLanguageInputInfo = () => {
+    const inputInfo = {
+      python: { method: 'input()', example: 'name = input("Enter your name: ")' },
+      javascript: { method: 'prompt()', example: 'let name = prompt("Enter your name: ")' },
+      typescript: { method: 'prompt()', example: 'let name = prompt("Enter your name: ")' },
+      java: { method: 'Scanner', example: 'Scanner scanner = new Scanner(System.in); String name = scanner.nextLine();' },
+      cpp: { method: 'cin', example: 'string name; cin >> name;' },
+      c: { method: 'scanf()', example: 'char name[50]; scanf("%s", name);' },
+      csharp: { method: 'Console.ReadLine()', example: 'string name = Console.ReadLine();' },
+      php: { method: 'fgets() or readline()', example: '$name = readline("Enter your name: ");' },
+      ruby: { method: 'gets', example: 'name = gets.chomp' },
+      go: { method: 'fmt.Scan', example: 'var name string; fmt.Scan(&name)' },
+      rust: { method: 'std::io::stdin()', example: 'let mut name = String::new(); std::io::stdin().read_line(&mut name);' },
+      swift: { method: 'readLine()', example: 'let name = readLine()' },
+      kotlin: { method: 'readLine()', example: 'val name = readLine()' }
+    };
+    
+    return inputInfo[language] || { method: 'input function', example: 'Check language documentation' };
+  };
+
   // If preview mode is active and HTML files exist, show PreviewMode component
   if (showPreview && hasHTMLFile) {
     return (
@@ -358,6 +494,8 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
       />
     );
   }
+
+  const languageInputInfo = getLanguageInputInfo();
 
   return (
     <MotionBox
@@ -419,6 +557,24 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
                   {language.toUpperCase()}
                 </Badge>
               )}
+              {hasInputRequirements && (
+                <Badge
+                  colorScheme="orange"
+                  variant="subtle"
+                  fontSize="xs"
+                >
+                  {inputFieldsCount} Input{inputFieldsCount > 1 ? 's' : ''}
+                </Badge>
+              )}
+              {output && (
+                <Badge
+                  colorScheme="blue"
+                  variant="subtle"
+                  fontSize="xs"
+                >
+                  API: {logs.find(log => log.message.includes('Executed using'))?.message.replace('✅ Executed using ', '').replace(' API', '') || 'CoderPoint'}
+                </Badge>
+              )}
             </HStack>
           </VStack>
         </HStack>
@@ -461,7 +617,7 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
               size="sm"
               leftIcon={isLoading ? <FaStop /> : <FaPlay />}
               variant="gradient"
-              onClick={runCode}
+              onClick={() => handleRunCode(false)}
               isLoading={isLoading}
               loadingText="Executing..."
               id="run-button"
@@ -471,6 +627,7 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
               }}
             >
               {isLoading ? "Stop" : "Run Code"}
+              {hasInputRequirements && ` (${inputFieldsCount})`}
             </Button>
           )}
           
@@ -512,6 +669,57 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
           </Tooltip>
         </HStack>
       </Flex>
+
+      {/* Input Status */}
+      {userInput && (
+        <Box
+          px={4}
+          py={2}
+          bg={colorMode === 'dark' ? 'blue.900' : 'blue.100'}
+          borderBottom="1px solid"
+          borderColor={colorMode === 'dark' ? 'blue.700' : 'blue.200'}
+        >
+          <HStack spacing={2}>
+            <Badge colorScheme="blue" fontSize="xs">
+              INPUT ACTIVE
+            </Badge>
+            <Text fontSize="xs" color={colorMode === 'dark' ? 'blue.300' : 'blue.700'}>
+              Using provided input: {userInput.split('\n').map((line, i) => `"${line}"`).join(', ')}
+            </Text>
+            <IconButton
+              size="xs"
+              icon={<FaTrash />}
+              variant="ghost"
+              onClick={() => setUserInput('')}
+              aria-label="Clear input"
+              colorScheme="blue"
+            />
+          </HStack>
+        </Box>
+      )}
+
+      {/* Language Input Info */}
+      {hasInputRequirements && (
+        <Box
+          px={4}
+          py={2}
+          bg={colorMode === 'dark' ? 'orange.900' : 'orange.100'}
+          borderBottom="1px solid"
+          borderColor={colorMode === 'dark' ? 'orange.700' : 'orange.200'}
+        >
+          <HStack spacing={3}>
+            <Badge colorScheme="orange" fontSize="xs">
+              {language.toUpperCase()} INPUT
+            </Badge>
+            <Text fontSize="xs" color={colorMode === 'dark' ? 'orange.300' : 'orange.700'}>
+              Method: {languageInputInfo.method}
+            </Text>
+            <Code fontSize="xs" bg="transparent" color={colorMode === 'dark' ? 'orange.200' : 'orange.800'}>
+              {languageInputInfo.example}
+            </Code>
+          </HStack>
+        </Box>
+      )}
 
       {/* Metrics Bar */}
       {(metrics.executionTime > 0 || isLoading) && (
@@ -642,6 +850,16 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
                   <Text fontSize="sm" color={colorMode === 'dark' ? 'gray.500' : 'gray.600'}>
                     Run your code to see output here
                   </Text>
+                  {hasInputRequirements && (
+                    <VStack spacing={1}>
+                      <Badge colorScheme="orange" variant="subtle">
+                        Input Detection Active
+                      </Badge>
+                      <Text fontSize="xs" color={colorMode === 'dark' ? 'orange.300' : 'orange.600'}>
+                        This {language} code uses {languageInputInfo.method} for user input
+                      </Text>
+                    </VStack>
+                  )}
                 </VStack>
               ) : (
                 <AnimatePresence>
@@ -655,18 +873,94 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
             </TabPanel>
 
             <TabPanel p={4}>
-              <Box
-                p={4}
-                bg={colorMode === 'dark' ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.05)'}
-                borderRadius="lg"
-                fontFamily="mono"
-                fontSize="sm"
-                minH="200px"
-              >
-                <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {output || error || "No output yet. Run your code to see results."}
-                </pre>
-              </Box>
+              <VStack align="stretch" spacing={4}>
+                {/* API Response Details */}
+                {output && (
+                  <Box
+                    p={4}
+                    bg={colorMode === 'dark' ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.05)'}
+                    borderRadius="lg"
+                    borderLeft="4px solid"
+                    borderColor="green.500"
+                  >
+                    <HStack justify="space-between" mb={2}>
+                      <Text fontWeight="bold" fontSize="sm">
+                        {language.toUpperCase()} Program Output
+                      </Text>
+                      <Badge colorScheme="green" fontSize="xs">
+                        SUCCESS
+                      </Badge>
+                    </HStack>
+                    <Box
+                      fontFamily="mono"
+                      fontSize="sm"
+                      bg={colorMode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'white'}
+                      p={3}
+                      borderRadius="md"
+                      maxH="400px"
+                      overflowY="auto"
+                    >
+                      <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0 }}>
+                        {output}
+                      </pre>
+                    </Box>
+                  </Box>
+                )}
+
+                {/* Error Output */}
+                {error && (
+                  <Box
+                    p={4}
+                    bg={colorMode === 'dark' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(220, 38, 38, 0.1)'}
+                    borderRadius="lg"
+                    borderLeft="4px solid"
+                    borderColor="red.500"
+                  >
+                    <HStack justify="space-between" mb={2}>
+                      <Text fontWeight="bold" fontSize="sm">
+                        {language.toUpperCase()} Execution Error
+                      </Text>
+                      <Badge colorScheme="red" fontSize="xs">
+                        ERROR
+                      </Badge>
+                    </HStack>
+                    <Box
+                      fontFamily="mono"
+                      fontSize="sm"
+                      bg={colorMode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'white'}
+                      p={3}
+                      borderRadius="md"
+                      maxH="400px"
+                      overflowY="auto"
+                    >
+                      <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0, color: 'red' }}>
+                        {error}
+                      </pre>
+                    </Box>
+                  </Box>
+                )}
+
+                {/* No Output State */}
+                {!output && !error && (
+                  <VStack spacing={4} justify="center" h="200px" opacity={0.5}>
+                    <FaCode size={48} />
+                    <Text fontSize="lg">No output yet</Text>
+                    <Text fontSize="sm" color={colorMode === 'dark' ? 'gray.500' : 'gray.600'}>
+                      Run your {language} code to see output here
+                    </Text>
+                    {hasInputRequirements && (
+                      <VStack spacing={2}>
+                        <Badge colorScheme="orange" variant="subtle">
+                          {language} Input Ready
+                        </Badge>
+                        <Text fontSize="xs" color={colorMode === 'dark' ? 'orange.300' : 'orange.600'}>
+                          Code requires {inputFieldsCount} input{inputFieldsCount > 1 ? 's' : ''} via {languageInputInfo.method}
+                        </Text>
+                      </VStack>
+                    )}
+                  </VStack>
+                )}
+              </VStack>
             </TabPanel>
 
             <TabPanel p={4}>
@@ -681,13 +975,32 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
                   >
                     <FaTimesCircle color="#ef4444" />
                     <VStack align="start" flex={1} spacing={1}>
-                      <Text fontWeight="bold" fontSize="sm">Execution Error</Text>
+                      <Text fontWeight="bold" fontSize="sm">{language} Execution Error</Text>
                       <Code fontSize="xs" bg="transparent">{error}</Code>
+                    </VStack>
+                  </HStack>
+                ) : hasInputRequirements ? (
+                  <HStack 
+                    p={3} 
+                    bg="rgba(245, 158, 11, 0.1)" 
+                    borderRadius="md"
+                    borderLeft="3px solid"
+                    borderColor="orange.500"
+                  >
+                    <FaInfoCircle color="#f59e0b" />
+                    <VStack align="start" flex={1} spacing={1}>
+                      <Text fontWeight="bold" fontSize="sm">{language} Input Required</Text>
+                      <Text fontSize="sm">
+                        This {language} code requires {inputFieldsCount} input{inputFieldsCount > 1 ? 's' : ''} using {languageInputInfo.method}.
+                      </Text>
+                      <Code fontSize="xs" bg="transparent" mt={1}>
+                        {languageInputInfo.example}
+                      </Code>
                     </VStack>
                   </HStack>
                 ) : (
                   <Text color={colorMode === 'dark' ? 'gray.500' : 'gray.600'}>
-                    No problems detected
+                    No problems detected in {language} code
                   </Text>
                 )}
               </VStack>
@@ -734,17 +1047,33 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
             />
             <VStack spacing={1}>
               <Text fontWeight="bold" fontSize="lg">
-                {compilerStatus === 'connecting' ? 'Connecting to Compiler...' : 'Executing Code...'}
+                {compilerStatus === 'connecting' ? `Connecting to ${language} Compiler...` : `Executing ${language} Code...`}
               </Text>
               <Text fontSize="sm" color={colorMode === 'dark' ? 'gray.400' : 'gray.600'}>
                 {compilerStatus === 'connecting' 
                   ? 'Establishing connection with cloud compiler...' 
-                  : 'Running your code on remote server...'}
+                  : `Running your ${language} code on remote server...`}
               </Text>
+              {hasInputRequirements && userInput && (
+                <Badge colorScheme="blue" mt={2}>
+                  Using {inputFieldsCount} provided input{inputFieldsCount > 1 ? 's' : ''}
+                </Badge>
+              )}
             </VStack>
           </VStack>
         </MotionBox>
       )}
+
+      {/* Input Modal */}
+      <InputModal
+        isOpen={isOpen}
+        onClose={onClose}
+        onExecute={handleExecuteWithInput}
+        language={language}
+        code={editorRef.current?.getValue()}
+        isLoading={isLoading}
+        inputFields={inputFields}
+      />
     </MotionBox>
   );
 };

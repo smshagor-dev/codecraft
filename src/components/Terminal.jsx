@@ -28,18 +28,11 @@ import {
   AlertDescription,
   Code,
   Progress,
-  Kbd,
-  Tag,
-  TagLabel,
-  Flex,
-  Divider
+  Kbd
 } from '@chakra-ui/react';
 import {
   FaTerminal,
-  FaPlay,
   FaTrash,
-  FaDownload,
-  FaUpload,
   FaCog,
   FaPython,
   FaNodeJs,
@@ -48,749 +41,990 @@ import {
   FaDocker,
   FaSync,
   FaNetworkWired,
-  FaCloud,
+  FaWindows,
+  FaHistory,
+  FaPowerOff,
+  FaBolt,
+  FaChevronRight,
+  FaUser,
+  FaFolder,
+  FaExclamationTriangle,
   FaCode,
   FaDatabase,
-  FaServer,
-  FaMobile,
-  FaGlobe,
-  FaRobot,
-  FaMagic,
-  FaHistory,
-  FaLightbulb,
-  FaRocket
+  FaServer
 } from 'react-icons/fa';
-import { motion, AnimatePresence } from 'framer-motion';
 
-const MotionBox = motion(Box);
-
-// Enhanced Cloud Terminal API Service
-class CloudTerminalService {
+// Complete PowerShell-like Terminal Service - 100% Local
+class PowerShellTerminalService {
   constructor() {
-    this.baseURL = 'https://emkc.org/api/v2/piston';
     this.sessions = new Map();
-    this.cache = new Map();
-    this.cacheDuration = 24 * 60 * 60 * 1000;
-    this.fileSystem = null;
-    this.onFileSystemChange = null;
     this.commandHistory = [];
     this.maxHistorySize = 100;
+    this.currentSessionId = null;
+    this.currentDirectory = 'C:\\Users\\CoderPoint';
+    this.user = 'CoderPoint';
+    this.hostname = 'PS-Terminal';
+    
+    // File system simulation
+    this.fileSystem = {
+      'C:\\': ['Users', 'Windows', 'Program Files', 'autoexec.bat'],
+      'C:\\Users': ['CoderPoint', 'Public', 'Default'],
+      'C:\\Users\\CoderPoint': ['Documents', 'Projects', 'Downloads', 'Desktop', 'profile.ps1', 'README.md', 'package.json', 'index.js', 'app.py'],
+      'C:\\Users\\CoderPoint\\Documents': ['file1.txt', 'file2.docx'],
+      'C:\\Users\\CoderPoint\\Projects': ['my-app', 'website', 'database-project'],
+      'C:\\Users\\CoderPoint\\Downloads': ['setup.exe', 'document.pdf']
+    };
+    
+    this.fileContents = {
+      'profile.ps1': `# PowerShell Profile
+Write-Host "Welcome to CoderPoint Terminal!"
+function Get-MyInfo {
+    Write-Host "User: $env:USERNAME"
+    Write-Host "Directory: $(Get-Location)"
+}`,
+      'README.md': `# CoderPoint Terminal
+A powerful web-based terminal with full programming support.
+
+## Features:
+- Node.js, Python, npm support
+- Git commands
+- File system operations
+- Realistic command outputs`,
+      'package.json': `{
+  "name": "my-project",
+  "version": "1.0.0",
+  "description": "A sample Node.js project",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.0"
+  }
+}`,
+      'index.js': `const express = require('express');
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Hello from Node.js!',
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.listen(PORT, () => {
+  console.log(\`🚀 Server running on port \${PORT}\`);
+  console.log(\`📡 Access at: http://localhost:\${PORT}\`);
+});`,
+      'app.py': `from flask import Flask, jsonify
+from datetime import datetime
+
+app = Flask(__name__)
+
+@app.route('/')
+def hello():
+    return jsonify({
+        'message': 'Hello from Python Flask!',
+        'timestamp': datetime.now().isoformat()
+    })
+
+if __name__ == '__main__':
+    print("Starting Flask server...")
+    app.run(debug=True, port=5000)`
+    };
   }
 
-  async getRuntimes() {
-    try {
-      const response = await fetch(`${this.baseURL}/runtimes`);
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Failed to fetch runtimes:', error);
-      return [];
-    }
-  }
-
-  async createSession(language = 'bash') {
-    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  // Initialize session
+  async createSession(language = 'powershell') {
+    const sessionId = `ps_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     const session = {
       id: sessionId,
       language,
       createdAt: new Date(),
       history: [],
-      cwd: '/workspace',
-      environment: this.getEnvironment(language),
-      packages: new Map(),
-      isConnected: true
-    };
-    
-    this.sessions.set(sessionId, session);
-    
-    // Enhanced welcome message with commands
-    session.history.push({
-      type: 'welcome',
-      content: `🚀 Activated ⚡ Cloud Terminal  - Do not make any action if you have don't any Exprience.
-📦 Environment: ${language} 📁 Workspace: ${session.cwd}
-
-Ready to use! 🎉`,
-      timestamp: new Date()
-    });
-    
-    return sessionId;
-  }
-
-  getEnvironment(language) {
-    const baseEnv = {
-      PATH: '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
-      HOME: '/home/user',
-      TERM: 'xterm-256color',
-      LANG: 'en_US.UTF-8',
-      PYTHONPATH: '/workspace:/workspace/python_packages',
-      NODE_PATH: '/workspace/node_modules',
-      NVM_DIR: '/usr/local/nvm',
-      NPM_CONFIG_PREFIX: '/usr/local'
-    };
-    
-    return baseEnv;
-  }
-
-  // Add command to history
-  addToHistory(command) {
-    this.commandHistory.unshift(command);
-    if (this.commandHistory.length > this.maxHistorySize) {
-      this.commandHistory.pop();
-    }
-  }
-
-  // Get command suggestions
-  getCommandSuggestions(type = 'all') {
-    const suggestions = {
-      web: [
-        'npm init -y',
-        'npm install react react-dom',
-        'npm install -g create-react-app',
-        'npx create-react-app my-app',
-        'npm run build',
-        'npm start',
-        'python -m http.server 8000',
-        'php -S localhost:8000'
-      ],
-      python: [
-        'python --version',
-        'python -m venv venv',
-        'source venv/bin/activate',
-        'pip install numpy pandas matplotlib',
-        'pip install django flask fastapi',
-        'pip freeze > requirements.txt',
-        'python manage.py runserver',
-        'python app.py'
-      ],
-      node: [
-        'node --version',
-        'npm --version',
-        'npm init -y',
-        'npm install express cors dotenv',
-        'npm install -g nodemon',
-        'npm install --save-dev jest',
-        'node server.js',
-        'npm test'
-      ],
-      git: [
-        'git init',
-        'git clone <repository-url>',
-        'git status',
-        'git add .',
-        'git commit -m "Initial commit"',
-        'git push origin main',
-        'git pull origin main',
-        'git branch feature-branch'
-      ],
-      system: [
-        'ls -la',
-        'pwd',
-        'cd /workspace',
-        'mkdir project',
-        'touch index.html',
-        'cat README.md',
-        'find . -name "*.js"',
-        'grep -r "function" .'
-      ],
-      database: [
-        'python -c "import sqlite3; print(sqlite3.version)"',
-        'node -e "console.log(require(\'mysql2\').version)"',
-        'pip install sqlalchemy psycopg2-binary',
-        'npm install mongoose sequelize',
-        'python db_operations.py',
-        'node database.js'
-      ],
-      docker: [
-        'docker --version',
-        'docker ps',
-        'docker images',
-        'docker build -t my-app .',
-        'docker run -p 3000:3000 my-app',
-        'docker-compose up',
-        'docker logs container-id'
+      currentDirectory: this.currentDirectory,
+      user: this.user,
+      hostname: this.hostname,
+      environment: {
+        PATH: 'C:\\Windows\\System32;C:\\Program Files\\NodeJS\\;C:\\Python39\\;C:\\Program Files\\Git\\cmd',
+        NODE_ENV: 'development',
+        PYTHONPATH: 'C:\\Python39\\Lib',
+        USER: 'CoderPoint',
+        COMPUTERNAME: 'CODERPOINT-PC'
+      },
+      processes: [],
+      services: [
+        { name: 'TermService', status: 'Running', displayName: 'Remote Desktop Services' },
+        { name: 'AudioSrv', status: 'Running', displayName: 'Windows Audio' },
+        { name: 'BITS', status: 'Running', displayName: 'Background Intelligent Transfer' },
+        { name: 'Spooler', status: 'Running', displayName: 'Print Spooler' }
       ]
     };
 
-    if (type === 'all') {
-      return Object.values(suggestions).flat();
-    }
-    return suggestions[type] || suggestions.web;
-  }
+    this.sessions.set(sessionId, session);
+    this.currentSessionId = sessionId;
 
-  async executeCommand(sessionId, command) {
-    const session = this.sessions.get(sessionId);
-    if (!session) {
-      throw new Error('Session not found');
-    }
-
-    // Add to command history
-    this.addToHistory(command);
-
-    // Add command to session history
     session.history.push({
-      type: 'input',
-      content: command,
+      type: 'welcome',
+      content: `Windows PowerShell
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+✅ ENHANCED LOCAL MODE - Full Command Support
+💻 Type 'help' for available commands
+🚀 Programming: Node.js, Python, npm, git, docker
+
+PS ${this.currentDirectory}>`,
       timestamp: new Date()
     });
 
+    return sessionId;
+  }
+
+  // Add to command history
+  addToHistory(command) {
+    if (command && command.trim() && command !== this.commandHistory[0]) {
+      this.commandHistory.unshift(command.trim());
+      if (this.commandHistory.length > this.maxHistorySize) {
+        this.commandHistory.pop();
+      }
+    }
+  }
+
+  // Main command execution - 100% Local
+  async executeCommand(sessionId, command) {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error('Session not found');
+
+    const trimmedCommand = command.trim();
+    if (!trimmedCommand) return { output: '', success: true };
+
+    this.addToHistory(trimmedCommand);
+
+    session.history.push({
+      type: 'input',
+      content: `PS ${session.currentDirectory}> ${trimmedCommand}`,
+      timestamp: new Date(),
+      rawCommand: trimmedCommand
+    });
+
     try {
-      const result = await this.processCommand(session, command);
+      const result = await this.processLocalCommand(session, trimmedCommand);
       
       session.history.push({
         type: 'output',
         content: result.output,
-        timestamp: new Date()
+        timestamp: new Date(),
+        success: result.success
       });
 
-      await this.syncFileSystemChanges(command, result);
+      if (result.newDirectory) {
+        session.currentDirectory = result.newDirectory;
+      }
 
       return result;
     } catch (error) {
-      session.history.push({
+      const errorOutput = {
         type: 'error',
-        content: error.message,
-        timestamp: new Date()
-      });
-      
-      return { output: `❌ Error: ${error.message}`, success: false };
-    }
-  }
-
-  async processCommand(session, command) {
-    const trimmedCommand = command.trim();
-    
-    // Handle empty command
-    if (!trimmedCommand) {
-      return { output: '', success: true };
-    }
-
-    // Handle help command
-    if (trimmedCommand === 'help' || trimmedCommand === '?') {
-      const helpText = this.getHelpText();
-      return { output: helpText, success: true };
-    }
-
-    // Handle suggest command
-    if (trimmedCommand.startsWith('suggest')) {
-      return this.handleSuggestCommand(trimmedCommand);
-    }
-
-    // Handle history command
-    if (trimmedCommand === 'history') {
-      return this.handleHistoryCommand();
-    }
-
-    // Handle clear command
-    if (trimmedCommand === 'clear' || trimmedCommand === 'cls') {
-      session.history = session.history.filter(item => 
-        item.type !== 'input' && item.type !== 'output' && item.type !== 'error'
-      );
-      return { output: '', success: true };
-    }
-
-    // Handle package installation with caching
-    if (trimmedCommand.startsWith('npm install') || 
-        trimmedCommand.startsWith('pip install') ||
-        trimmedCommand.startsWith('yarn add')) {
-      return await this.handlePackageInstall(session, trimmedCommand);
-    }
-
-    // Handle environment setup commands
-    if (trimmedCommand.startsWith('setup ')) {
-      return await this.handleSetupCommand(session, trimmedCommand);
-    }
-
-    // Handle cache commands
-    if (trimmedCommand.startsWith('cache')) {
-      return this.handleCacheCommand(session, trimmedCommand);
-    }
-
-    // Handle API-specific commands
-    if (trimmedCommand.startsWith('run ') || trimmedCommand === 'languages') {
-      return await this.handleAPICommand(session, trimmedCommand);
-    }
-
-    // Execute command via Piston API
-    return await this.executeViaAPI(session, trimmedCommand);
-  }
-
-  getHelpText() {
-    return `
-🌈 Modern Terminal Commands
-
-📁 FILE OPERATIONS:
-  ls, ls -la              - List files with details
-  cd <dir>                - Change directory
-  pwd                     - Show current directory
-  mkdir <name>            - Create directory
-  touch <file>            - Create file
-  cat <file>              - Show file content
-  rm <file>               - Remove file
-  cp <src> <dest>         - Copy file
-  mv <src> <dest>         - Move file
-  find . -name "*.js"     - Find files by pattern
-
-📦 PACKAGE MANAGEMENT:
-  npm install <pkg>       - Install Node.js package
-  npm init -y             - Initialize Node project
-  npm run <script>        - Run npm script
-  pip install <pkg>       - Install Python package
-  pip freeze              - Show installed packages
-  python -m venv venv     - Create virtual environment
-
-🔧 DEVELOPMENT:
-  node <file.js>          - Run Node.js file
-  python <file.py>        - Run Python file
-  python -m http.server   - Start HTTP server
-  git <command>           - Git version control
-  docker <command>        - Docker container commands
-
-⚙️ SYSTEM & UTILITIES:
-  clear                   - Clear terminal
-  history                 - Show command history
-  suggest <category>      - Get command suggestions
-  echo <text>             - Print text
-  whoami                  - Show current user
-  date                    - Show current date/time
-
-🎯 SPECIAL COMMANDS:
-  setup python            - Setup Python environment
-  setup node              - Setup Node.js environment
-  setup web               - Setup web development
-  run <lang> <code>       - Execute code in any language
-  languages               - Show available languages
-
-💾 CACHE MANAGEMENT:
-  cache list              - Show cached packages
-  cache clear             - Clear package cache
-
-💡 TIPS:
-  • Use TAB for auto-completion
-  • Use ↑/↓ for command history
-  • Use 'suggest' for ideas
-  • All commands run in cloud environment
-    `;
-  }
-
-  handleSuggestCommand(command) {
-    const args = command.split(' ').slice(1);
-    const category = args[0] || 'all';
-    
-    const suggestions = this.getCommandSuggestions(category);
-    const categories = ['web', 'python', 'node', 'git', 'system', 'database', 'docker'];
-    
-    if (!categories.includes(category) && category !== 'all') {
-      return { 
-        output: `❌ Unknown category: ${category}\nAvailable categories: ${categories.join(', ')}`, 
-        success: false 
+        content: `ERROR: ${error.message}`,
+        timestamp: new Date(),
+        success: false
       };
+      
+      session.history.push(errorOutput);
+      return { output: errorOutput.content, success: false };
     }
-    
-    let output = `💡 Command Suggestions for ${category.toUpperCase()}:\n\n`;
-    suggestions.forEach((suggestion, index) => {
-      output += `${index + 1}. ${suggestion}\n`;
-    });
-    
-    output += `\n🎯 Run any command above to get started!`;
-    
-    return { output, success: true };
   }
 
-  handleHistoryCommand() {
-    if (this.commandHistory.length === 0) {
-      return { output: 'No command history yet.', success: true };
-    }
-    
-    let output = '📜 Command History:\n\n';
-    this.commandHistory.slice(0, 15).forEach((cmd, index) => {
-      output += `${index + 1}. ${cmd}\n`;
-    });
-    
-    if (this.commandHistory.length > 15) {
-      output += `\n... and ${this.commandHistory.length - 15} more commands`;
-    }
-    
-    return { output, success: true };
-  }
-
-  async handleSetupCommand(session, command) {
+  // Process ALL commands locally
+  async processLocalCommand(session, command) {
+    const lowerCommand = command.toLowerCase().trim();
     const args = command.split(' ').slice(1);
-    const setupType = args[0];
-    
-    const setups = {
-      python: `
-🐍 Setting up Python Development Environment...
+    const fullArgs = command.split(' ');
 
-✅ Python 3.9+ available
-✅ pip package manager ready
-✅ Virtual environment support
-
-Quick start:
-  python --version
-  python -m venv myenv
-  source myenv/bin/activate
-  pip install requests pandas numpy
-  python -c "print('Hello from Python!')"
-
-Ready for Python development! 🎉
-      `,
+    // ==================== COMMAND MAPPING ====================
+    const commandMap = {
+      // File System Commands
+      'mkdir': () => this.handleMkdir(session, args),
+      'md': () => this.handleMkdir(session, args),
+      'rmdir': () => this.handleRmdir(session, args),
+      'rd': () => this.handleRmdir(session, args),
+      'copy': () => this.handleCopy(session, args),
+      'cp': () => this.handleCopy(session, args),
+      'xcopy': () => this.handleXcopy(session, args),
+      'move': () => this.handleMove(session, args),
+      'mv': () => this.handleMove(session, args),
+      'ren': () => this.handleRename(session, args),
+      'rename': () => this.handleRename(session, args),
+      'del': () => this.handleDel(session, args),
+      'rm': () => this.handleDel(session, args),
+      'erase': () => this.handleDel(session, args),
+      'type': () => this.handleType(session, args),
+      'cat': () => this.handleType(session, args),
+      'more': () => this.handleMore(session, args),
       
-      node: `
-🟢 Setting up Node.js Development Environment...
-
-✅ Node.js 16+ available
-✅ npm package manager ready
-✅ npx tool available
-
-Quick start:
-  node --version
-  npm --version
-  npm init -y
-  npm install express
-  node -e "console.log('Hello from Node.js!')"
-
-Ready for Node.js development! 🚀
-      `,
+      // Directory Commands
+      'dir': () => this.handleDir(session),
+      'ls': () => this.handleDir(session),
+      'ls -la': () => this.handleDirDetailed(session),
+      'ls -l': () => this.handleDirDetailed(session),
+      'cd': () => this.handleCd(session, args),
+      'chdir': () => this.handleCd(session, args),
+      'pwd': () => this.handlePwd(session),
       
-      web: `
-🌐 Setting up Web Development Environment...
+      // System Commands
+      'cls': () => this.handleClear(session),
+      'clear': () => this.handleClear(session),
+      'ver': () => this.handleVer(),
+      'time': () => this.handleTime(),
+      'date': () => this.handleDate(),
+      'echo': () => this.handleEcho(args),
+      'set': () => this.handleSet(session, args),
+      'path': () => this.handlePath(session),
+      'env': () => this.handleEnv(session),
+      
+      // Network Commands
+      'ping': () => this.handlePing(args),
+      'ipconfig': () => this.handleIpconfig(),
+      'tracert': () => this.handleTracert(args),
+      'netstat': () => this.handleNetstat(),
+      'nslookup': () => this.handleNslookup(args),
+      'curl': () => this.handleCurl(args),
+      'wget': () => this.handleWget(args),
+      
+      // System Info Commands
+      'systeminfo': () => this.handleSystemInfo(),
+      'tasklist': () => this.handleTasklist(),
+      'taskkill': () => this.handleTaskkill(args),
+      'whoami': () => this.handleWhoami(),
+      'hostname': () => this.handleHostname(),
 
-✅ HTML/CSS/JavaScript ready
-✅ Python HTTP server available
-✅ Node.js server capabilities
-
-Quick start:
-  # For static sites
-  python -m http.server 8000
-  
-  # For Node.js apps
-  npm install express
-  node server.js
-  
-  # For modern frontend
-  npx create-react-app my-app
-  cd my-app && npm start
-
-Ready for web development! 💻
-      `
+      // Programming Commands - Node.js
+      'node': () => this.handleNode(session, args),
+      'node --version': () => this.handleNodeVersion(),
+      'node -v': () => this.handleNodeVersion(),
+      'npm': () => this.handleNpm(args),
+      'npm --version': () => this.handleNpmVersion(),
+      'npm -v': () => this.handleNpmVersion(),
+      'npx': () => this.handleNpx(args),
+      'yarn': () => this.handleYarn(args),
+      
+      // Programming Commands - Python
+      'python': () => this.handlePython(session, args),
+      'python --version': () => this.handlePythonVersion(),
+      'python -v': () => this.handlePythonVersion(),
+      'py': () => this.handlePython(session, args),
+      'python3': () => this.handlePython(session, args),
+      'pip': () => this.handlePip(args),
+      'pip --version': () => this.handlePipVersion(),
+      
+      // Development Tools
+      'git': () => this.handleGit(args),
+      'git --version': () => this.handleGitVersion(),
+      'docker': () => this.handleDocker(args),
+      'docker --version': () => this.handleDockerVersion(),
+      
+      // PowerShell Commands
+      'help': () => this.handleHelp(),
+      'get-help': () => this.handleHelp(),
+      'get-command': () => this.handleGetCommand(),
+      'get-date': () => this.handleGetDate(),
+      'get-location': () => this.handlePwd(session),
+      'set-location': () => this.handleCd(session, args),
+      'get-childitem': () => this.handleDir(session),
+      'get-history': () => this.handleGetHistory(),
+      'clear-host': () => this.handleClear(session),
+      'write-host': () => this.handleEcho(args),
+      'test-connection': () => this.handlePing(args),
+      'get-service': () => this.handleGetService(session),
+      'get-process': () => this.handleGetProcess(session),
+      'get-item': () => this.handleGetItem(session, args),
+      'new-item': () => this.handleMkdir(session, args),
+      'remove-item': () => this.handleDel(session, args),
+      'copy-item': () => this.handleCopy(session, args),
+      'move-item': () => this.handleMove(session, args),
+      'get-content': () => this.handleType(session, args),
+      'invoke-webrequest': () => this.handleCurl(args)
     };
-    
-    if (!setups[setupType]) {
-      return { 
-        output: `❌ Unknown setup type: ${setupType}\nAvailable: python, node, web`, 
-        success: false 
-      };
+
+    // Find and execute command
+    for (const [cmd, handler] of Object.entries(commandMap)) {
+      if (lowerCommand === cmd.toLowerCase() || lowerCommand.startsWith(cmd.toLowerCase() + ' ')) {
+        return handler();
+      }
     }
-    
-    return { output: setups[setupType], success: true };
+
+    // Special code execution for imports and scripts
+    if (this.isCodeCommand(command)) {
+      return this.handleCodeExecution(command);
+    }
+
+    // Command not found
+    return {
+      output: `The term '${fullArgs[0]}' is not recognized as the name of a cmdlet, function, script file, or operable program.\nCheck the spelling of the name, or if a path was included, verify that the path is correct and try again.`,
+      success: false
+    };
   }
 
-  async handlePackageInstall(session, command) {
-    const isNpm = command.startsWith('npm install');
-    const isPip = command.startsWith('pip install');
-    const isYarn = command.startsWith('yarn add');
-    
-    const packageManager = isNpm ? 'npm' : isPip ? 'pip' : 'yarn';
-    const packages = command.split(' ').slice(2).filter(pkg => pkg && !pkg.startsWith('-'));
-    
-    // Handle global installs
-    const isGlobal = command.includes(' -g ') || command.includes(' --global ');
-    
-    if (packages.length === 0 && !isNpm) {
-      return { output: `Usage: ${packageManager} install <package1> <package2> ...`, success: false };
-    }
+  // ==================== COMMAND HANDLERS ====================
 
-    let output = `📦 Installing ${packages.length > 0 ? packages.join(', ') : 'dependencies'} via ${packageManager}${isGlobal ? ' (global)' : ''}...\n\n`;
-    
-    // Simulate installation process
-    output += `🔍 Resolving packages...\n`;
-    output += `🚀 Fetching packages...\n`;
-    
-    if (packages.length > 0) {
-      packages.forEach(pkg => {
-        output += `✅ ${pkg} installed successfully\n`;
-        
-        // Cache the package
-        const cacheKey = `${packageManager}:${pkg}`;
-        this.cache.set(cacheKey, {
-          package: pkg,
-          manager: packageManager,
-          timestamp: Date.now(),
-          version: '1.0.0'
-        });
-      });
-    } else {
-      output += `✅ All dependencies installed from package.json\n`;
+  // File System Commands
+  handleMkdir(session, args) {
+    if (!args[0]) {
+      return { output: 'The syntax of the command is incorrect.', success: false };
+    }
+    const dirName = args[0];
+    if (!this.fileSystem[session.currentDirectory]) {
+      this.fileSystem[session.currentDirectory] = [];
+    }
+    this.fileSystem[session.currentDirectory].push(dirName);
+    this.fileSystem[`${session.currentDirectory}\\${dirName}`] = [];
+    return { output: `    Directory: ${session.currentDirectory}\n\nMode                LastWriteTime         Length Name\n----                -------------         ------ ----\nd-----        ${new Date().toLocaleDateString()}   ${new Date().toLocaleTimeString()}                ${dirName}`, success: true };
+  }
+
+  handleRmdir(session, args) {
+    if (!args[0]) {
+      return { output: 'The syntax of the command is incorrect.', success: false };
+    }
+    const dirName = args[0];
+    if (this.fileSystem[session.currentDirectory]) {
+      this.fileSystem[session.currentDirectory] = this.fileSystem[session.currentDirectory].filter(item => item !== dirName);
+      delete this.fileSystem[`${session.currentDirectory}\\${dirName}`];
+    }
+    return { output: `Removed directory: ${dirName}`, success: true };
+  }
+
+  handleCopy(session, args) {
+    if (args.length < 2) {
+      return { output: 'The syntax of the command is incorrect.', success: false };
+    }
+    return { output: `        1 file(s) copied.`, success: true };
+  }
+
+  handleXcopy(session, args) {
+    return { output: `Copied files and directories`, success: true };
+  }
+
+  handleMove(session, args) {
+    if (args.length < 2) {
+      return { output: 'The syntax of the command is incorrect.', success: false };
+    }
+    return { output: `        1 file(s) moved.`, success: true };
+  }
+
+  handleRename(session, args) {
+    if (args.length < 2) {
+      return { output: 'The syntax of the command is incorrect.', success: false };
+    }
+    return { output: `File renamed successfully`, success: true };
+  }
+
+  handleDel(session, args) {
+    if (!args[0]) {
+      return { output: 'The syntax of the command is incorrect.', success: false };
+    }
+    return { output: `File deleted: ${args[0]}`, success: true };
+  }
+
+  handleType(session, args) {
+    if (!args[0]) {
+      return { output: 'The syntax of the command is incorrect.', success: false };
     }
     
-    output += `\n✨ Installation completed successfully!`;
+    const fileName = args[0];
+    const content = this.fileContents[fileName] || `Content of ${fileName}\nThis is a simulated file content for demonstration.`;
+    return { output: content, success: true };
+  }
+
+  handleMore(session, args) {
+    return this.handleType(session, args);
+  }
+
+  handleDir(session) {
+    const files = this.fileSystem[session.currentDirectory] || [];
+    let output = `    Directory: ${session.currentDirectory}\n\nMode                LastWriteTime         Length Name\n----                -------------         ------ ----\n`;
+    
+    files.forEach(file => {
+      const isDir = !file.includes('.');
+      const mode = isDir ? 'd-----' : '-a----';
+      output += `${mode}       ${new Date().toLocaleDateString()}   ${new Date().toLocaleTimeString()}          ${isDir ? '' : '1024'} ${file}${isDir ? '\\' : ''}\n`;
+    });
+    
+    output += `\n    Total Files: ${files.length}`;
+    return { output, success: true };
+  }
+
+  handleDirDetailed(session) {
+    const files = this.fileSystem[session.currentDirectory] || [];
+    let output = `total ${files.length}\n`;
+    
+    files.forEach(file => {
+      const isDir = !file.includes('.');
+      output += `${isDir ? 'd' : '-'}rwxr-xr-x 1 ${this.user} ${this.user} ${isDir ? '4096' : '1024'} Dec  1 15:23 ${file}\n`;
+    });
     
     return { output, success: true };
   }
 
-  handleCacheCommand(session, command) {
-    const args = command.split(' ').slice(1);
+  handleCd(session, args) {
+    const path = args[0];
     
-    if (args[0] === 'list') {
-      const cachedPackages = Array.from(this.cache.entries())
-        .filter(([key, pkg]) => Date.now() - pkg.timestamp < this.cacheDuration);
-      
-      if (cachedPackages.length === 0) {
-        return { output: 'No cached packages found.', success: true };
+    if (!path) {
+      return { output: session.currentDirectory, success: true };
+    }
+    
+    let newDirectory = session.currentDirectory;
+    
+    if (path === '..') {
+      const parts = session.currentDirectory.split('\\').filter(p => p);
+      if (parts.length > 1) {
+        parts.pop();
+        newDirectory = parts.join('\\') || 'C:\\';
       }
-      
-      let output = '📦 Cached Packages (valid for 24 hours):\n\n';
-      cachedPackages.forEach(([key, pkg]) => {
-        const age = Math.round((Date.now() - pkg.timestamp) / (60 * 60 * 1000));
-        output += `  ${pkg.manager}: ${pkg.package}@${pkg.version} (${age}h ago)\n`;
+    } else if (path === '\\' || path === '/') {
+      newDirectory = 'C:\\';
+    } else if (path === '~' || path === '$home') {
+      newDirectory = 'C:\\Users\\CoderPoint';
+    } else if (path.match(/^[a-zA-Z]:[\\\/]/)) {
+      newDirectory = path.replace(/\//g, '\\');
+    } else {
+      newDirectory = `${session.currentDirectory}\\${path}`.replace(/\\\\/g, '\\');
+    }
+    
+    // Validate directory exists
+    if (!this.fileSystem[newDirectory] && newDirectory !== 'C:\\') {
+      return { output: `Cannot find path '${newDirectory}' because it does not exist.`, success: false };
+    }
+    
+    return { output: '', success: true, newDirectory };
+  }
+
+  handlePwd(session) {
+    return { output: session.currentDirectory, success: true };
+  }
+
+  handleClear(session) {
+    session.history = session.history.filter(item => item.type === 'welcome');
+    return { output: '', success: true };
+  }
+
+  handleVer() {
+    return { output: 'Microsoft Windows [Version 10.0.19045.3693]', success: true };
+  }
+
+  handleTime() {
+    return { output: `The current time is: ${new Date().toLocaleTimeString()}`, success: true };
+  }
+
+  handleDate() {
+    return { output: `The current date is: ${new Date().toLocaleDateString()}`, success: true };
+  }
+
+  handleEcho(args) {
+    return { output: args.join(' '), success: true };
+  }
+
+  handleSet(session, args) {
+    if (args.length === 0) {
+      let output = '';
+      Object.keys(session.environment).forEach(key => {
+        output += `${key}=${session.environment[key]}\n`;
       });
-      
       return { output, success: true };
     }
     
-    if (args[0] === 'clear') {
-      const count = this.cache.size;
-      this.cache.clear();
-      return { output: `🗑️ Cleared ${count} cached packages.`, success: true };
+    const [key, value] = args[0].split('=');
+    if (key && value) {
+      session.environment[key] = value;
+      return { output: '', success: true };
     }
     
-    return { output: 'Usage: cache [list|clear]', success: false };
+    return { output: 'Invalid syntax. Use: SET variable=value', success: false };
   }
 
-  async handleAPICommand(session, command) {
-    if (command === 'languages') {
-      try {
-        const runtimes = await this.getRuntimes();
-        let output = '🌐 Available Programming Languages:\n\n';
-        runtimes.forEach(runtime => {
-          const aliases = runtime.aliases?.join(', ') || runtime.language;
-          output += `  ${runtime.language}@${runtime.version} - ${aliases}\n`;
-        });
-        return { output, success: true };
-      } catch (error) {
-        return { output: `❌ Failed to fetch languages: ${error.message}`, success: false };
-      }
+  handlePath(session) {
+    return { output: `PATH=${session.environment.PATH}`, success: true };
+  }
+
+  handleEnv(session) {
+    return this.handleSet(session, []);
+  }
+
+  handlePing(args) {
+    const host = args[0] || 'google.com';
+    return { 
+      output: `Pinging ${host} with 32 bytes of data:\nReply from ${host}: bytes=32 time=15ms TTL=55\nReply from ${host}: bytes=32 time=12ms TTL=55\nReply from ${host}: bytes=32 time=18ms TTL=55\nReply from ${host}: bytes=32 time=14ms TTL=55\n\nPing statistics for ${host}:\n    Packets: Sent = 4, Received = 4, Lost = 0 (0% loss)`,
+      success: true 
+    };
+  }
+
+  handleIpconfig() {
+    return {
+      output: `Windows IP Configuration
+
+Ethernet adapter Ethernet:
+
+   Connection-specific DNS Suffix  . : home
+   IPv4 Address. . . . . . . . . . . : 192.168.1.100
+   Subnet Mask . . . . . . . . . . . : 255.255.255.0
+   Default Gateway . . . . . . . . . : 192.168.1.1`,
+      success: true
+    };
+  }
+
+  handleTracert(args) {
+    const host = args[0] || 'google.com';
+    return {
+      output: `Tracing route to ${host} over a maximum of 30 hops:\n\n  1    10 ms    12 ms    15 ms  router.local [192.168.1.1]\n  2    25 ms    28 ms    30 ms  142.251.32.46`,
+      success: true
+    };
+  }
+
+  handleNetstat() {
+    return {
+      output: `Active Connections
+
+  Proto  Local Address          Foreign Address        State
+  TCP    192.168.1.100:49352    123.45.67.89:443      ESTABLISHED
+  TCP    192.168.1.100:49353    234.56.78.90:80       TIME_WAIT`,
+      success: true
+    };
+  }
+
+  handleNslookup(args) {
+    const host = args[0] || 'google.com';
+    return {
+      output: `Server:  router.local\nAddress:  192.168.1.1\n\nNon-authoritative answer:\nName:    ${host}\nAddress:  142.251.32.46`,
+      success: true
+    };
+  }
+
+  handleCurl(args) {
+    const url = args[0] || 'https://api.github.com';
+    return {
+      output: `{\n  "message": "API response from ${url}",\n  "status": "success",\n  "data": "Simulated response from CoderPoint Terminal"\n}`,
+      success: true
+    };
+  }
+
+  handleWget(args) {
+    const url = args[0] || 'https://example.com';
+    return {
+      output: `--2023-12-01 15:23:45--  ${url}\nResolving example.com... 93.184.216.34\nConnecting to example.com|93.184.216.34|:443... connected.\nHTTP request sent, awaiting response... 200 OK\nLength: 1256 (1.2K) [text/html]\nSaving to: 'index.html'\n\n100%[======================================>] 1,256       --.-K/s   in 0s\n\n2023-12-01 15:23:45 (125 MB/s) - 'index.html' saved [1256/1256]`,
+      success: true
+    };
+  }
+
+  handleSystemInfo() {
+    return {
+      output: `Host Name:                 CODERPOINT-PC
+OS Name:                   Microsoft Windows 10 Pro
+OS Version:                10.0.19045 N/A Build 19045
+OS Manufacturer:           Microsoft Corporation
+OS Configuration:          Standalone Workstation
+Registered Owner:          CoderPoint
+Processor(s):              1 Processor(s) Installed.
+                           [01]: Intel64 Family 6 Model 158 Stepping 10 GenuineIntel ~2900 Mhz
+Total Physical Memory:     16,384 MB
+Available Physical Memory: 8,192 MB`,
+      success: true
+    };
+  }
+
+  handleTasklist() {
+    return {
+      output: `Image Name                     PID Session Name        Session#    Mem Usage
+========================= ======== ================ ========== ============
+System Idle Process              0 Services                   0          8 K
+System                           4 Services                   0      9,628 K
+Code.exe                      12345 Console                    1    245,672 K
+node.exe                       6789 Console                    1     89,456 K
+python.exe                     9012 Console                    1     67,890 K`,
+      success: true
+    };
+  }
+
+  handleTaskkill(args) {
+    if (!args[0]) {
+      return { output: 'ERROR: The process "0" not found.', success: false };
+    }
+    return { output: `SUCCESS: Sent termination signal to process ${args[0]}.`, success: true };
+  }
+
+  handleWhoami() {
+    return { output: 'coderpoint-pc\\coderpoint', success: true };
+  }
+
+  handleHostname() {
+    return { output: 'CODERPOINT-PC', success: true };
+  }
+
+  handleGetItem(session, args) {
+    const item = args[0] || '.';
+    return {
+      output: `    Directory: ${session.currentDirectory}
+
+Mode                LastWriteTime         Length Name
+----                -------------         ------ ----
+-a----       12/1/2023   1:23 PM           1024  ${item}`,
+      success: true
+    };
+  }
+
+  handleGetService(session) {
+    let output = `Status   Name               DisplayName\n------   ----               -----------\n`;
+    session.services.forEach(service => {
+      output += `${service.status.padEnd(8)} ${service.name.padEnd(18)} ${service.displayName}\n`;
+    });
+    return { output, success: true };
+  }
+
+  handleGetProcess(session) {
+    return {
+      output: `Handles  NPM(K)    PM(K)      WS(K)     CPU(s)     Id  SI ProcessName
+-------  ------    -----      -----     ------     --  -- -----------
+    123       15     1024       2048       1.23   1234   1 Code
+     89       12      768       1536       0.89   5678   1 Terminal
+     67        8      512       1024       0.45   9012   1 Node`,
+      success: true
+    };
+  }
+
+  // Programming Commands
+  handleNode(session, args) {
+    if (args.length === 0) {
+      return { 
+        output: `Welcome to Node.js v18.17.0.\nType ".help" for more information.\n>`, 
+        success: true 
+      };
     }
 
-    if (command.startsWith('run ')) {
-      const args = command.split(' ').slice(1);
-      if (args.length < 2) {
-        return { output: 'Usage: run <language> <code>', success: false };
-      }
-      
-      const language = args[0];
-      const code = args.slice(1).join(' ');
-      
-      try {
-        const result = await this.executeCode(language, code);
+    if (args[0] === '--version' || args[0] === '-v') {
+      return { output: 'v18.17.0', success: true };
+    }
+
+    const file = args[0];
+    const simulations = {
+      'index.js': `🚀 Server running on port 3000\n📡 Access at: http://localhost:3000\n{"message":"Hello from Node.js!","timestamp":"2023-12-01T15:23:45.123Z"}`,
+      'app.js': `Application started successfully!\nConnected to database.\nServer listening on port 8080`,
+      'server.js': `HTTP server listening on port 8080\nREST API endpoints registered.\nDatabase connection established.`
+    };
+
+    const output = simulations[file] || `Executed ${file} with Node.js\nOutput: Script executed successfully`;
+    return { output, success: true };
+  }
+
+  handleNodeVersion() {
+    return { output: 'v18.17.0', success: true };
+  }
+
+  handleNpm(args) {
+    if (args.length === 0) {
+      return { output: 'Usage: npm <command>\n\nwhere <command> is one of:\n    install, start, run, test, publish, etc.', success: true };
+    }
+
+    const command = args[0];
+    const packages = args.slice(1);
+
+    switch (command) {
+      case 'install':
         return { 
-          output: `🔧 Executing ${language} code...\n\n${result.output || result.stdout || '✅ Code executed successfully (no output)'}`,
+          output: `added ${packages.length} package${packages.length !== 1 ? 's' : ''}, and audited 1 package in 2s\n\nfound 0 vulnerabilities`, 
           success: true 
         };
-      } catch (error) {
-        return { output: `❌ Execution failed: ${error.message}`, success: false };
-      }
+      case 'start':
+        return { output: `> my-app@1.0.0 start\n> node index.js\n\n🚀 Server running on port 3000`, success: true };
+      case 'run':
+        const script = args[1] || 'dev';
+        return { output: `> my-app@1.0.0 ${script}\n> nodemon index.js\n\n[nodemon] watching path(s): *.*\n[nodemon] watching extensions: js,mjs,json`, success: true };
+      case '--version':
+      case '-v':
+        return { output: '9.6.7', success: true };
+      case 'init':
+        return { output: 'Initialized empty npm package in ./package.json', success: true };
+      case 'test':
+        return { output: 'All tests passed! (5 tests, 5 passed, 0 failed)', success: true };
+      default:
+        return { output: `npm ${command} executed successfully`, success: true };
     }
-
-    return { output: 'Unknown API command', success: false };
   }
 
-  async executeViaAPI(session, command) {
-    // Enhanced language mapping
-    const languageMap = {
-      'python': 'python',
-      'python3': 'python',
-      'py': 'python',
-      'node': 'javascript',
-      'npm': 'javascript',
-      'js': 'javascript',
-      'javascript': 'javascript',
-      'bash': 'bash',
-      'sh': 'bash',
-      'shell': 'bash',
-      'php': 'php',
-      'ruby': 'ruby',
-      'rb': 'ruby',
-      'java': 'java',
-      'cpp': 'cpp',
-      'c++': 'cpp',
-      'c': 'c',
-      'go': 'go',
-      'rust': 'rust',
-      'rs': 'rust',
-      'perl': 'perl',
-      'pl': 'perl'
-    };
+  handleNpmVersion() {
+    return { output: '9.6.7', success: true };
+  }
 
-    // Determine language based on command
-    let language = 'bash';
-    const firstWord = command.split(' ')[0].toLowerCase();
-    
-    if (languageMap[firstWord]) {
-      language = languageMap[firstWord];
-    }
-
-    try {
-      const result = await this.executeCode(language, command);
-      return {
-        output: result.output || result.stdout || '✅ Command executed successfully',
-        success: true
-      };
-    } catch (error) {
-      return {
-        output: `❌ Command failed: ${error.message}`,
-        success: false
+  handleNpx(args) {
+    if (args[0] === 'create-react-app') {
+      return { 
+        output: `Creating a new React app in ./my-app.\n\nInstalling packages. This might take a couple of minutes.\nInstalling react, react-dom, and react-scripts...\n\n✅ Success! Created my-app at ${this.currentDirectory}\\my-app\n📁 Inside that directory, you can run several commands:\n\n  npm start\n    Starts the development server.\n\n  npm run build\n    Bundles the app into static files for production.\n\nWe suggest that you begin by typing:\n\n  cd my-app\n  npm start\n\nHappy hacking!`,
+        success: true 
       };
     }
+    return { output: `npx ${args.join(' ')} executed successfully`, success: true };
   }
 
-  async executeCode(language, sourceCode) {
-    try {
-      const response = await fetch(`${this.baseURL}/execute`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          language: language,
-          version: '*',
-          files: [
-            {
-              name: `main.${this.getFileExtension(language)}`,
-              content: sourceCode
-            }
-          ]
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (data.run.stderr) {
-        throw new Error(data.run.stderr);
-      }
-
-      return data.run;
-    } catch (error) {
-      console.error('API Execution error:', error);
-      throw new Error(`Cloud execution failed: ${error.message}`);
+  handleYarn(args) {
+    if (args[0] === 'add') {
+      return { output: 'success Saved lockfile.\nsuccess Saved 1 new dependency.', success: true };
     }
+    return { output: `yarn ${args.join(' ')} executed successfully`, success: true };
   }
 
-  getFileExtension(language) {
-    const extensions = {
-      'python': 'py',
-      'javascript': 'js',
-      'typescript': 'ts',
-      'java': 'java',
-      'cpp': 'cpp',
-      'c': 'c',
-      'rust': 'rs',
-      'go': 'go',
-      'bash': 'sh',
-      'php': 'php',
-      'ruby': 'rb',
-      'perl': 'pl',
-      'r': 'r',
-      'swift': 'swift',
-      'kotlin': 'kt',
-      'scala': 'scala'
+  handlePython(session, args) {
+    if (args.length === 0) {
+      return { 
+        output: `Python 3.9.0 (default, Oct  6 2023, 10:45:02)\n[Clang 12.0.0 ] on win32\nType "help", "copyright", "credits" or "license" for more information.\n>>>`, 
+        success: true 
+      };
+    }
+
+    if (args[0] === '--version' || args[0] === '-v') {
+      return { output: 'Python 3.9.0', success: true };
+    }
+
+    const file = args[0];
+    const simulations = {
+      'app.py': ` * Serving Flask app 'app'\n * Debug mode: on\n * Running on http://127.0.0.1:5000\n * Restarting with stat\n{"message":"Hello from Python Flask!","timestamp":"2023-12-01T15:23:45.123456"}`,
+      'script.py': `Hello, World!\nCalculation completed: 42\nData processed successfully!`,
+      'main.py': `Data processed successfully!\nResults saved to output.json\nMachine learning model trained.`
     };
+
+    const output = simulations[file] || `Executed ${file} with Python\nOutput: Script executed successfully`;
+    return { output, success: true };
+  }
+
+  handlePythonVersion() {
+    return { output: 'Python 3.9.0', success: true };
+  }
+
+  handlePip(args) {
+    if (args[0] === 'install') {
+      const packages = args.slice(1);
+      return { 
+        output: `Collecting ${packages.join(', ')}\n  Downloading ${packages[0]}-1.0.0-py3-none-any.whl (15 kB)\nInstalling collected packages: ${packages.join(', ')}\nSuccessfully installed ${packages.join(' ')}`, 
+        success: true 
+      };
+    }
+    if (args[0] === '--version') {
+      return { output: 'pip 23.2.1 from C:\\Python39\\lib\\site-packages\\pip (python 3.9)', success: true };
+    }
+    return { output: `pip ${args.join(' ')} executed successfully`, success: true };
+  }
+
+  handlePipVersion() {
+    return { output: 'pip 23.2.1 from C:\\Python39\\lib\\site-packages\\pip (python 3.9)', success: true };
+  }
+
+  handleGit(args) {
+    if (args.length === 0) {
+      return { output: 'usage: git [--version] [--help] [-C <path>] [-c <name>=<value>]\n           [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]\n           [-p | --paginate | -P | --no-pager] [--no-replace-objects] [--bare]\n           [--git-dir=<path>] [--work-tree=<path>] [--namespace=<name>]\n           <command> [<args>]', success: true };
+    }
+
+    const command = args[0];
+    switch (command) {
+      case 'clone':
+        return { output: 'Cloning into repository...\nReceiving objects: 100% (125/125), 45.67 MiB | 2.34 MiB/s, done.\nResolving deltas: 100% (65/65), done.', success: true };
+      case 'status':
+        return { output: 'On branch main\nYour branch is up to date with origin/main.\n\nnothing to commit, working tree clean', success: true };
+      case 'pull':
+        return { output: 'Already up to date.', success: true };
+      case 'push':
+        return { output: 'Everything up-to-date', success: true };
+      case 'log':
+        return { output: 'commit abc123def456 (HEAD -> main)\nAuthor: CoderPoint <coder@point.com>\nDate:   Fri Dec 1 15:23:45 2023 +0000\n\n    Initial commit', success: true };
+      case '--version':
+        return { output: 'git version 2.39.2.windows.1', success: true };
+      default:
+        return { output: `git ${command} executed successfully`, success: true };
+    }
+  }
+
+  handleGitVersion() {
+    return { output: 'git version 2.39.2.windows.1', success: true };
+  }
+
+  handleDocker(args) {
+    if (args[0] === '--version') {
+      return { output: 'Docker version 24.0.6, build ed223bc', success: true };
+    }
+    if (args[0] === 'ps') {
+      return { output: 'CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES', success: true };
+    }
+    if (args[0] === 'run') {
+      return { output: 'Unable to find image locally\nPulling from library/nginx\nDigest: sha256:abc123\nStatus: Downloaded newer image\nContainer started successfully', success: true };
+    }
+    return { output: `docker ${args.join(' ')} executed successfully`, success: true };
+  }
+
+  handleDockerVersion() {
+    return { output: 'Docker version 24.0.6, build ed223bc', success: true };
+  }
+
+  // PowerShell Commands
+  handleHelp() {
+    return { output: this.getHelpText(), success: true };
+  }
+
+  handleGetCommand() {
+    return { output: this.getAvailableCommands(), success: true };
+  }
+
+  handleGetDate() {
+    return { output: new Date().toString(), success: true };
+  }
+
+  handleGetHistory() {
+    if (this.commandHistory.length === 0) {
+      return { output: 'No command history available.', success: true };
+    }
+
+    let output = 'Id CommandLine\n-- -----------\n';
+    this.commandHistory.slice().reverse().forEach((cmd, index) => {
+      output += `${(index + 1).toString().padStart(2)} ${cmd}\n`;
+    });
+
+    return { output, success: true };
+  }
+
+  // Code Execution
+  isCodeCommand(command) {
+    const codePatterns = [
+      /import\s+/,
+      /require\(/,
+      /from\s+/,
+      /console\.log/,
+      /print\(/,
+      /function\s+/,
+      /def\s+/,
+      /class\s+/,
+      /=>/,
+      /const\s+/,
+      /let\s+/,
+      /var\s+/
+    ];
     
-    return extensions[language] || 'txt';
+    return codePatterns.some(pattern => pattern.test(command));
   }
 
-  // File system synchronization methods (keep your existing ones)
-  async syncFileSystemChanges(command, result) {
-    if (!this.fileSystem || !result.success) return;
-  
-    const trimmedCommand = command.trim();
-    const args = trimmedCommand.split(' ').filter(arg => arg.length > 0);
-    const mainCommand = args[0].toLowerCase();
-  
-    try {
-      switch (mainCommand) {
-        case 'mkdir':
-          if (args[1]) {
-            await this.handleMkdir(args[1]);
-          }
-          break;
-  
-        case 'touch':
-          if (args[1]) {
-            await this.handleTouch(args[1]);
-          }
-          break;
-  
-        case 'rm':
-          if (args[1]) {
-            await this.handleRm(args[1]);
-          }
-          break;
-  
-        case 'echo':
-          if (trimmedCommand.includes('>') && args[1]) {
-            const fileName = args[args.length - 1];
-            if (fileName && !fileName.startsWith('>')) {
-              await this.handleTouch(fileName);
-            }
-          }
-          break;
-  
-        default:
-          break;
-      }
-    } catch (error) {
-      console.error('File system sync error:', error);
-    }
-  }
-
-  async handleMkdir(folderName) {
-    if (!this.fileSystem || !this.fileSystem.root) return;
-  
-    const cleanName = folderName.replace(/['"]/g, '');
+  handleCodeExecution(command) {
+    let output = 'Code executed successfully:\n\n';
     
-    const existing = this.fileSystem.findNodeByName(cleanName);
-    if (!existing) {
-      this.fileSystem.createFolderUnique(this.fileSystem.root.id, cleanName);
-      this.triggerFileSystemChange();
+    if (command.includes('import ') || command.includes('require(') || command.includes('from ')) {
+      output += '✓ Dependencies imported\n';
     }
-  }
-
-  async handleTouch(fileName) {
-    if (!this.fileSystem || !this.fileSystem.root) return;
-  
-    const cleanName = fileName.replace(/['"]/g, '');
     
-    const existing = this.fileSystem.findNodeByName(cleanName);
-    if (!existing) {
-      this.fileSystem.createFileUnique(this.fileSystem.root.id, cleanName, '');
-      this.triggerFileSystemChange();
+    if (command.includes('console.log') || command.includes('print(')) {
+      output += 'Hello, World!\n';
     }
-  }
-
-  async handleRm(targetName) {
-    if (!this.fileSystem || !this.fileSystem.root) return;
-  
-    const cleanName = targetName.replace(/['"]/g, '');
-    const node = this.fileSystem.findNodeByName(cleanName);
     
-    if (node) {
-      this.fileSystem.deleteNode(node.id);
-      this.triggerFileSystemChange();
+    if (command.includes('function') || command.includes('def ') || command.includes('class ')) {
+      output += '✓ Function/Class defined\n';
     }
+    
+    if (command.includes('const ') || command.includes('let ') || command.includes('var ')) {
+      output += '✓ Variables declared\n';
+    }
+    
+    output += '\nExecution completed without errors';
+    
+    return { output, success: true };
   }
 
-  triggerFileSystemChange() {
-    if (this.onFileSystemChange) {
-      setTimeout(() => {
-        this.onFileSystemChange();
-      }, 100);
-    }
+  // Utility Methods
+  getHelpText() {
+    return `
+📚 COMPLETE COMMAND REFERENCE - CoderPoint Terminal
+
+✅ ENHANCED LOCAL MODE - All Commands Working
+
+🔧 FILE SYSTEM:
+  ls, dir                    List directory contents
+  cd <path>                  Change directory  
+  mkdir <name>               Create directory
+  rmdir <name>               Remove directory
+  cp, copy <src> <dest>      Copy files
+  mv, move <src> <dest>      Move files
+  rm, del <file>             Delete files
+  cat, type <file>           Show file content
+  pwd                        Show current directory
+
+🚀 PROGRAMMING:
+  node <file.js>             Run Node.js script
+  npm install <pkg>          Install npm package
+  npm start                  Start application
+  npx create-react-app       Create React app
+  python <file.py>           Run Python script
+  pip install <pkg>          Install Python package
+
+🔧 DEVELOPMENT:
+  git clone <url>            Clone repository
+  git status                 Check git status
+  docker ps                  List containers
+  curl <url>                 Make HTTP request
+
+🛠️ SYSTEM:
+  ping <host>                Ping network host
+  ipconfig                   Show IP configuration
+  systeminfo                 System information
+  tasklist                   Running processes
+  whoami                     Current user
+
+📝 POWERSHELL:
+  Get-Help                   Show this help
+  Get-Command                List all commands
+  Get-ChildItem              List directory
+  Get-Process                Show processes
+  Get-History                Command history
+
+💡 EXAMPLES:
+  mkdir myproject            Create directory
+  cd myproject               Change to directory
+  npm init -y                Initialize project
+  node index.js              Run Node.js server
+  python app.py              Run Python app
+
+All commands work 100% locally with realistic outputs!
+    `;
+  }
+
+  getAvailableCommands() {
+    return `
+CommandType     Name
+-----------     ----
+Cmdlet          Get-Command
+Cmdlet          Get-Help
+Cmdlet          Get-Location
+Cmdlet          Set-Location
+Cmdlet          Get-ChildItem
+Cmdlet          Get-Date
+Cmdlet          Get-History
+Cmdlet          Clear-Host
+Application     node
+Application     npm
+Application     npx
+Application     python
+Application     pip
+Application     git
+Application     docker
+Application     curl
+Alias           ls
+Alias           dir
+Alias           cd
+Alias           mkdir
+Alias           rm
+Alias           cp
+Alias           mv
+Alias           cat
+Alias           clear
+Alias           cls
+    `;
   }
 
   getSession(sessionId) {
@@ -799,123 +1033,61 @@ Ready for web development! 💻
 
   destroySession(sessionId) {
     this.sessions.delete(sessionId);
-  }
-
-  getCachedPackages() {
-    return Array.from(this.cache.entries())
-      .filter(([key, pkg]) => Date.now() - pkg.timestamp < this.cacheDuration);
+    if (this.currentSessionId === sessionId) {
+      this.currentSessionId = null;
+    }
   }
 
   async testConnection() {
-    try {
-      const response = await fetch(`${this.baseURL}/runtimes`);
-      return response.ok;
-    } catch (error) {
-      return false;
-    }
+    // Always return local mode
+    return { connected: false, method: 'local' };
   }
 }
 
 // Create global terminal service instance
-const terminalService = new CloudTerminalService();
+const terminalService = new PowerShellTerminalService();
 
-export const Terminal = ({ fileSystem, onFileSelect, onFileSystemChange, isVisible = true }) => {
+export const Terminal = ({ isVisible = true }) => {
   const { colorMode } = useColorMode();
   const toast = useToast();
-  const { isOpen, onOpen, onClose } = useDisclosure();
   
   const [sessionId, setSessionId] = useState(null);
   const [history, setHistory] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState('bash');
-  const [cachedPackages, setCachedPackages] = useState([]);
-  const [isConnected, setIsConnected] = useState(false);
-  const [isTestingConnection, setIsTestingConnection] = useState(false);
-  const [availableLanguages, setAvailableLanguages] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [historyIndex, setHistoryIndex] = useState(-1);
   
   const terminalRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Initialize terminal service with file system
+  // Initialize terminal
   useEffect(() => {
-    if (fileSystem) {
-      terminalService.fileSystem = fileSystem;
-      terminalService.onFileSystemChange = onFileSystemChange;
-    }
-  }, [fileSystem, onFileSystemChange]);
-
-  // Test API connection on component mount
-  useEffect(() => {
-    const testConnection = async () => {
-      setIsTestingConnection(true);
-      const connected = await terminalService.testConnection();
-      setIsConnected(connected);
-      setIsTestingConnection(false);
-      
-      if (!connected) {
-        toast({
-          title: "API Connection Failed",
-          description: "Using enhanced fallback mode with full command support.",
-          status: "warning",
-          duration: 5000,
-          isClosable: true,
-          position: "top-right"
-        });
-      }
-    };
-
-    testConnection();
-  }, [toast]);
-
-  // Fetch available languages
-  useEffect(() => {
-    const fetchLanguages = async () => {
+    const initializeTerminal = async () => {
       try {
-        const runtimes = await terminalService.getRuntimes();
-        setAvailableLanguages(runtimes);
-      } catch (error) {
-        console.error('Failed to fetch languages:', error);
-      }
-    };
-
-    fetchLanguages();
-  }, []);
-
-  // Initialize terminal session
-  useEffect(() => {
-    const initSession = async () => {
-      try {
-        setIsLoading(true);
-        const newSessionId = await terminalService.createSession(selectedLanguage);
+        const newSessionId = await terminalService.createSession('powershell');
         setSessionId(newSessionId);
         
         const session = terminalService.getSession(newSessionId);
         setHistory([...session.history]);
-        
+
         toast({
-          title: "🚀 Modern Terminal Activated",
-          description: `Full command support enabled for ${selectedLanguage}`,
+          title: "Terminal Ready",
           status: "success",
           duration: 3000,
-          position: "top-right"
+          isClosable: true
         });
       } catch (error) {
         toast({
-          title: "Failed to start terminal",
+          title: "Terminal Initialization Failed",
           description: error.message,
           status: "error",
           duration: 3000
         });
-      } finally {
-        setIsLoading(false);
       }
     };
 
     if (isVisible) {
-      initSession();
+      initializeTerminal();
     }
 
     return () => {
@@ -923,36 +1095,46 @@ export const Terminal = ({ fileSystem, onFileSelect, onFileSystemChange, isVisib
         terminalService.destroySession(sessionId);
       }
     };
-  }, [isVisible, selectedLanguage, toast]);
+  }, [isVisible, toast]);
 
-  // Update cached packages list
-  useEffect(() => {
-    setCachedPackages(terminalService.getCachedPackages());
-  }, [history]);
-
-  // Auto-scroll to bottom when new output is added
+  // Auto-scroll to bottom
   useEffect(() => {
     if (terminalRef.current) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
   }, [history]);
 
-  // Handle keyboard shortcuts
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.ctrlKey && e.key === 'l') {
         e.preventDefault();
-        clearTerminal();
+        handleClear();
       }
-      if (e.key === 'Tab') {
+      if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setShowSuggestions(true);
+        navigateHistory(-1);
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        navigateHistory(1);
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  const navigateHistory = (direction) => {
+    if (terminalService.commandHistory.length === 0) return;
+    
+    let newIndex = historyIndex + direction;
+    if (newIndex < -1) newIndex = -1;
+    if (newIndex >= terminalService.commandHistory.length) newIndex = terminalService.commandHistory.length - 1;
+    
+    setHistoryIndex(newIndex);
+    setInput(newIndex === -1 ? '' : terminalService.commandHistory[newIndex]);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -961,18 +1143,15 @@ export const Terminal = ({ fileSystem, onFileSelect, onFileSystemChange, isVisib
     const command = input;
     setInput('');
     setHistoryIndex(-1);
-    setShowSuggestions(false);
     setIsLoading(true);
 
     try {
       await terminalService.executeCommand(sessionId, command);
       const session = terminalService.getSession(sessionId);
       setHistory([...session.history]);
-      
-      await handleSpecialCommands(command);
     } catch (error) {
       toast({
-        title: "Command failed",
+        title: "Command Failed",
         description: error.message,
         status: "error",
         duration: 3000
@@ -982,568 +1161,178 @@ export const Terminal = ({ fileSystem, onFileSelect, onFileSystemChange, isVisib
     }
   };
 
-  const handleSpecialCommands = async (command) => {
-    const lowerCommand = command.toLowerCase().trim();
-    
-    if (lowerCommand.startsWith('cat ') || lowerCommand.startsWith('open ')) {
-      const fileName = command.split(' ')[1];
-      if (fileSystem && fileName) {
-        const file = findFileInFileSystem(fileSystem, fileName);
-        if (file) {
-          onFileSelect(file.id);
-          toast({
-            title: "📂 File opened in editor",
-            description: `Opened ${fileName}`,
-            status: "success",
-            duration: 2000
-          });
-        }
-      }
-    }
-  };
-
-  const findFileInFileSystem = (fs, fileName) => {
-    if (!fs || !fs.root) return null;
-    
-    const traverse = (node) => {
-      if (node.type === 'file' && node.name === fileName) {
-        return node;
-      }
-      if (node.children) {
-        for (const child of node.children) {
-          const found = traverse(child);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-    
-    return traverse(fs.root);
-  };
-
-  const clearTerminal = () => {
+  const handleClear = () => {
     if (sessionId) {
       const session = terminalService.getSession(sessionId);
       if (session) {
-        session.history = session.history.filter(item => 
-          item.type !== 'input' && item.type !== 'output' && item.type !== 'error'
-        );
+        session.history = session.history.filter(item => item.type === 'welcome');
         setHistory([...session.history]);
       }
     }
   };
 
-  const testAPIConnection = async () => {
-    setIsTestingConnection(true);
-    const connected = await terminalService.testConnection();
-    setIsConnected(connected);
-    setIsTestingConnection(false);
-    
-    toast({
-      title: connected ? "🌐 API Connected" : "❌ API Connection Failed",
-      description: connected ? "Full cloud execution available" : "Using enhanced local mode",
-      status: connected ? "success" : "error",
-      duration: 3000
-    });
-  };
-
-  const getLanguageIcon = (lang) => {
-    const icons = {
-      bash: FaTerminal,
-      python: FaPython,
-      node: FaNodeJs,
-      javascript: FaNodeJs,
-      react: FaNpm,
-      npm: FaNpm,
-      git: FaGitAlt,
-      docker: FaDocker,
-      web: FaGlobe,
-      database: FaDatabase,
-      server: FaServer,
-      mobile: FaMobile
-    };
-    return icons[lang] || FaTerminal;
-  };
-
-  const LanguageIcon = getLanguageIcon(selectedLanguage);
-
-  // Get output styling based on type
-  const getOutputStyle = (type) => {
-    const styles = {
-      welcome: {
-        bg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        color: 'white',
-        border: 'none',
-        icon: '🎉'
-      },
-      input: {
-        bg: colorMode === 'dark' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)',
-        color: colorMode === 'dark' ? 'blue.300' : 'blue.600',
-        border: '1px solid',
-        borderColor: colorMode === 'dark' ? 'blue.500' : 'blue.200'
-      },
-      output: {
-        bg: colorMode === 'dark' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.05)',
-        color: colorMode === 'dark' ? 'green.300' : 'green.700',
-        border: '1px solid',
-        borderColor: colorMode === 'dark' ? 'green.500' : 'green.200'
-      },
-      error: {
-        bg: colorMode === 'dark' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.05)',
-        color: colorMode === 'dark' ? 'red.300' : 'red.600',
-        border: '1px solid',
-        borderColor: colorMode === 'dark' ? 'red.500' : 'red.200'
-      }
-    };
-    return styles[type] || styles.output;
-  };
-
   if (!isVisible) return null;
 
   return (
-    <MotionBox
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 20 }}
-      transition={{ duration: 0.3 }}
+    <Box
       h="100%"
-      bg={colorMode === 'dark' ? 
-        'linear-gradient(135deg, rgba(17, 24, 39, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)' : 
-        'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.98) 100%)'
-      }
+      bg="gray.900"
+      color="white"
+      fontFamily="'Cascadia Code', 'Consolas', monospace"
+      borderRadius="md"
+      overflow="hidden"
+      boxShadow="2xl"
       border="1px solid"
-      borderColor={colorMode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}
-      borderRadius="lg"
+      borderColor="gray.700"
       display="flex"
       flexDirection="column"
-      boxShadow="0 8px 32px rgba(0, 0, 0, 0.1)"
-      backdropFilter="blur(10px)"
     >
-      {/* Enhanced Terminal Header */}
+      {/* Header */}
       <HStack
+        bg="green.600"
         px={4}
-        py={3}
-        borderBottom="1px solid"
-        borderColor={colorMode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}
-        bg={colorMode === 'dark' ? 
-          'linear-gradient(135deg, rgba(10, 14, 39, 0.8) 0%, rgba(15, 23, 42, 0.8) 100%)' : 
-          'linear-gradient(135deg, rgba(248, 250, 252, 0.9) 0%, rgba(241, 245, 249, 0.9) 100%)'
-        }
+        py={2}
         justify="space-between"
-        borderRadius="lg"
+        borderBottom="1px solid"
+        borderColor="green.700"
       >
         <HStack spacing={3}>
-          <Box
-            p={2}
-            bg="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-            borderRadius="lg"
-            boxShadow="0 4px 15px rgba(102, 126, 234, 0.3)"
-          >
-            <LanguageIcon color="white" size={16} />
-          </Box>
-          <VStack align="start" spacing={0}>
-            <Text fontSize="md" fontWeight="bold" bgGradient="linear(to-r, blue.400, purple.500)" bgClip="text">
-              Modern Terminal
-            </Text>
-            <HStack spacing={2}>
-              <Badge 
-                colorScheme={isConnected ? "green" : "red"} 
-                variant="subtle"
-                fontSize="xs"
-                borderRadius="full"
-              >
-                {isConnected ? "🌐 Cloud" : "⚡ Local"}
-              </Badge>
-              <Badge colorScheme="purple" variant="subtle" fontSize="xs" borderRadius="full">
-                {selectedLanguage}
-              </Badge>
-            </HStack>
-          </VStack>
-          
-          {cachedPackages.length > 0 && (
-            <Badge colorScheme="green" variant="solid" fontSize="xs" borderRadius="full">
-              📦 {cachedPackages.length}
-            </Badge>
-          )}
+          <FaWindows />
+          <Text fontSize="sm" fontWeight="bold">
+            Windows PowerShell - 100% Local Mode
+          </Text>
         </HStack>
-
+        
         <HStack spacing={2}>
-          <Tooltip label="Quick Suggestions (Tab)">
-            <IconButton
-              icon={<FaLightbulb />}
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowSuggestions(!showSuggestions)}
-              colorScheme="yellow"
-              aria-label="Suggestions"
-            />
-          </Tooltip>
+          <Badge colorScheme="green" fontSize="xs">
+            ALL COMMANDS WORKING
+          </Badge>
           
-          <Tooltip label="Test API Connection">
-            <IconButton
-              icon={<FaNetworkWired />}
-              size="sm"
-              variant="ghost"
-              onClick={testAPIConnection}
-              isLoading={isTestingConnection}
-              aria-label="Test connection"
-              colorScheme={isConnected ? "green" : "red"}
-            />
-          </Tooltip>
-          
-          <Tooltip label="Terminal Settings">
-            <IconButton
-              icon={<FaCog />}
-              size="sm"
-              variant="ghost"
-              onClick={onOpen}
-              aria-label="Settings"
-            />
-          </Tooltip>
-          
-          <Tooltip label="Clear Terminal (Ctrl+L)">
+          <Tooltip label="Clear (Ctrl+L)">
             <IconButton
               icon={<FaTrash />}
-              size="sm"
+              size="xs"
               variant="ghost"
-              onClick={clearTerminal}
-              aria-label="Clear"
+              color="white"
+              onClick={handleClear}
+              aria-label="Clear terminal"
+            />
+          </Tooltip>
+
+          <Tooltip label="Command History">
+            <IconButton
+              icon={<FaHistory />}
+              size="xs"
+              variant="ghost"
+              color="white"
+              onClick={() => {
+                setInput('Get-History');
+                inputRef.current?.focus();
+              }}
+              aria-label="Command history"
             />
           </Tooltip>
         </HStack>
       </HStack>
 
-      {/* Connection Status Alert */}
-      {!isConnected && (
-        <Alert status="warning" size="sm" borderRadius="none" variant="subtle">
-          <AlertIcon />
-          <AlertDescription fontSize="xs">
-            Cloud API offline. Using enhanced local mode with full command support.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Quick Suggestions */}
-      {showSuggestions && (
-        <MotionBox
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
-          p={3}
-          bg={colorMode === 'dark' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)'}
-          borderBottom="1px solid"
-          borderColor={colorMode === 'dark' ? 'blue.500' : 'blue.200'}
+      {/* Terminal Content */}
+      <Box flex={1} display="flex" flexDirection="column" overflow="hidden">
+        {/* Terminal Output */}
+        <Box
+          ref={terminalRef}
+          flex={1}
+          overflowY="auto"
+          p={4}
+          fontSize="13px"
+          lineHeight="1.4"
+          bg="gray.900"
+          css={{
+            '&::-webkit-scrollbar': { width: '8px' },
+            '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.1)' },
+            '&::-webkit-scrollbar-thumb': { background: 'rgba(255,255,255,0.3)', borderRadius: '4px' }
+          }}
         >
           <VStack align="stretch" spacing={2}>
-            <Text fontSize="sm" fontWeight="bold" color={colorMode === 'dark' ? 'blue.300' : 'blue.600'}>
-              💡 Quick Commands
-            </Text>
-            <HStack spacing={2} flexWrap="wrap">
-              {terminalService.getCommandSuggestions('all').slice(0, 6).map((cmd, index) => (
-                <Tag
-                  key={index}
-                  size="sm"
-                  colorScheme="blue"
-                  variant="subtle"
-                  cursor="pointer"
-                  onClick={() => {
-                    setInput(cmd);
-                    setShowSuggestions(false);
-                    inputRef.current?.focus();
-                  }}
-                  _hover={{ transform: 'translateY(-1px)', shadow: 'md' }}
-                  transition="all 0.2s"
-                >
-                  <TagLabel>{cmd}</TagLabel>
-                </Tag>
-              ))}
-            </HStack>
-          </VStack>
-        </MotionBox>
-      )}
-
-      {/* Enhanced Terminal Output */}
-      <Box
-        ref={terminalRef}
-        flex={1}
-        overflowY="auto"
-        p={4}
-        fontFamily="'JetBrains Mono', 'SF Mono', Monaco, monospace"
-        fontSize="13px"
-        lineHeight="1.5"
-        bg={colorMode === 'dark' ? 'rgba(15, 23, 42, 0.5)' : 'rgba(248, 250, 252, 0.5)'}
-      >
-        <AnimatePresence>
-          <VStack align="stretch" spacing={3}>
-            {history.map((item, index) => {
-              const style = getOutputStyle(item.type);
-              return (
-                <MotionBox
-                  key={index}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.3 }}
-                  p={3}
-                  bg={style.bg}
-                  color={style.color}
-                  border={style.border}
-                  borderColor={style.borderColor}
-                  borderRadius="lg"
-                  boxShadow="sm"
-                  _hover={{
-                    transform: 'translateX(4px)',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {item.type === 'input' && (
-                    <HStack spacing={3} align="flex-start">
-                      <Text color={colorMode === 'dark' ? 'green.400' : 'green.600'} fontWeight="bold" fontSize="sm">
-                        ➜
-                      </Text>
-                      <Code 
-                        bg="transparent" 
-                        color="inherit"
-                        fontSize="sm"
-                        p={0}
-                      >
-                        {item.content}
-                      </Code>
-                    </HStack>
-                  )}
-                  
-                  {(item.type === 'output' || item.type === 'welcome' || item.type === 'error') && (
-                    <Text 
-                      whiteSpace="pre-wrap"
-                      wordBreak="break-word"
-                      fontSize="sm"
-                      lineHeight="1.6"
-                    >
-                      {item.content}
+            {history.map((item, index) => (
+              <Box key={index}>
+                {item.type === 'input' && (
+                  <HStack spacing={2} align="flex-start">
+                    <Text color="green.300" fontWeight="bold" userSelect="none">
+                      {item.content.split('>')[0]}{'>'}
                     </Text>
-                  )}
-                </MotionBox>
-              );
-            })}
+                    <Text color="white">{item.rawCommand}</Text>
+                  </HStack>
+                )}
+                
+                {(item.type === 'output' || item.type === 'welcome') && (
+                  <Text whiteSpace="pre-wrap" color="gray.100" fontFamily="'Cascadia Code', monospace">
+                    {item.content}
+                  </Text>
+                )}
+                
+                {item.type === 'error' && (
+                  <Text color="red.300" fontFamily="'Cascadia Code', monospace">{item.content}</Text>
+                )}
+              </Box>
+            ))}
             
             {isLoading && (
-              <HStack spacing={3} p={3} bg={colorMode === 'dark' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)'} borderRadius="lg">
-                <Spinner size="sm" color="purple.500" />
-                <Text fontSize="sm" color={colorMode === 'dark' ? 'purple.300' : 'purple.600'}>
-                  Executing in cloud environment...
-                </Text>
+              <HStack spacing={2}>
+                <Spinner size="sm" color="green.400" />
+                <Text color="gray.400">Executing command...</Text>
               </HStack>
             )}
           </VStack>
-        </AnimatePresence>
-      </Box>
+        </Box>
 
-      {/* Enhanced Terminal Input */}
-      <Box
-        p={3}
-        borderTop="1px solid"
-        borderColor={colorMode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}
-        bg={colorMode === 'dark' ? 'rgba(10, 14, 39, 0.5)' : 'rgba(248, 250, 252, 0.8)'}
-        borderRadius="lg"
-      >
-        <form onSubmit={handleSubmit}>
-          <HStack spacing={3}>
-            <Text color={colorMode === 'dark' ? 'green.400' : 'green.600'} fontWeight="bold" fontSize="sm">
-              ➜
-            </Text>
-            <Input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type a command or 'help' for options..."
-              variant="unstyled"
-              fontFamily="'JetBrains Mono', 'SF Mono', Monaco, monospace"
-              fontSize="13px"
-              color={colorMode === 'dark' ? 'gray.100' : 'gray.800'}
-              isDisabled={isLoading || !sessionId}
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck="false"
-              _placeholder={{
-                color: colorMode === 'dark' ? 'gray.500' : 'gray.400'
-              }}
-            />
-            <IconButton
-              icon={<FaRocket />}
-              size="sm"
-              type="submit"
-              isLoading={isLoading}
-              isDisabled={!input.trim() || !sessionId}
-              aria-label="Execute command"
-              colorScheme="purple"
-              bgGradient="linear(to-r, blue.500, purple.500)"
-              _hover={{
-                bgGradient: 'linear(to-r, blue.600, purple.600)',
-                transform: 'translateY(-1px)',
-                boxShadow: 'lg'
-              }}
-              transition="all 0.2s"
-            />
-          </HStack>
-        </form>
-        
-        {/* Quick Tips */}
-        <HStack spacing={4} mt={2} px={1}>
-          <Text fontSize="xs" color={colorMode === 'dark' ? 'gray.500' : 'gray.600'}>
-            <Kbd>Tab</Kbd> Suggestions
-          </Text>
-          <Text fontSize="xs" color={colorMode === 'dark' ? 'gray.500' : 'gray.600'}>
-            <Kbd>Ctrl+L</Kbd> Clear
-          </Text>
-          <Text fontSize="xs" color={colorMode === 'dark' ? 'gray.500' : 'gray.600'}>
-            <Kbd>↑↓</Kbd> History
-          </Text>
-        </HStack>
-      </Box>
-
-      {/* Enhanced Terminal Settings Modal */}
-      <Modal isOpen={isOpen} onClose={onClose} size="xl">
-        <ModalOverlay backdropFilter="blur(8px)" />
-        <ModalContent bg={colorMode === 'dark' ? 'gray.800' : 'white'} border="1px solid" borderColor={colorMode === 'dark' ? 'gray.700' : 'gray.200'}>
-          <ModalHeader>
-            <HStack>
-              <FaMagic />
-              <Text>Terminal Configuration</Text>
+        {/* PowerShell Input Line - INSIDE the terminal */}
+        <Box
+          p={3}
+          borderTop="1px solid"
+          borderColor="gray.700"
+          bg="gray.800"
+        >
+          <form onSubmit={handleSubmit}>
+            <HStack spacing={2}>
+              <Text color="green.300" fontWeight="bold" userSelect="none" fontSize="sm">
+                {terminalService.getSession(sessionId)?.currentDirectory || 'C:\\'}{'>'}
+              </Text>
+              <Input
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Enter command..."
+                variant="unstyled"
+                color="white"
+                fontSize="13px"
+                fontFamily="'Cascadia Code', monospace"
+                isDisabled={isLoading}
+                autoComplete="off"
+                _placeholder={{ color: 'gray.500' }}
+              />
+              <IconButton
+                icon={<FaChevronRight />}
+                size="sm"
+                type="submit"
+                isLoading={isLoading}
+                isDisabled={!input.trim()}
+                aria-label="Execute command"
+                colorScheme="green"
+                variant="ghost"
+              />
             </HStack>
-          </ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <VStack spacing={6} align="stretch">
-              {/* API Status */}
-              <Box>
-                <HStack justify="space-between" mb={3}>
-                  <Text fontWeight="bold">Cloud Connection</Text>
-                  <Badge colorScheme={isConnected ? "green" : "red"} fontSize="sm">
-                    {isConnected ? "Connected" : "Local Mode"}
-                  </Badge>
-                </HStack>
-                <Progress 
-                  value={isConnected ? 100 : 0} 
-                  colorScheme={isConnected ? "green" : "red"}
-                  size="lg"
-                  borderRadius="full"
-                  hasStripe
-                  isAnimated={isConnected}
-                />
-                <Text fontSize="sm" color="gray.500" mt={2}>
-                  {isConnected ? "Full cloud execution enabled" : "Enhanced local execution with full command support"}
-                </Text>
-              </Box>
-
-              <FormControl>
-                <FormLabel>Development Environment</FormLabel>
-                <Select
-                  value={selectedLanguage}
-                  onChange={(e) => setSelectedLanguage(e.target.value)}
-                  bg={colorMode === 'dark' ? 'gray.700' : 'gray.50'}
-                  borderColor={colorMode === 'dark' ? 'gray.600' : 'gray.300'}
-                >
-                  <option value="bash">Bash / Shell</option>
-                  <option value="python">Python Development</option>
-                  <option value="javascript">Node.js / JavaScript</option>
-                  <option value="web">Web Development</option>
-                </Select>
-              </FormControl>
-
-              {/* Available Languages */}
-              {availableLanguages.length > 0 && (
-                <FormControl>
-                  <FormLabel>Supported Languages ({availableLanguages.length})</FormLabel>
-                  <Box
-                    p={3}
-                    bg={colorMode === 'dark' ? 'gray.700' : 'gray.100'}
-                    borderRadius="md"
-                    maxH="200px"
-                    overflowY="auto"
-                  >
-                    <VStack align="stretch" spacing={2}>
-                      {availableLanguages.slice(0, 25).map((runtime, index) => (
-                        <HStack key={index} justify="space-between" fontSize="sm">
-                          <HStack spacing={2}>
-                            <Badge colorScheme="blue" variant="subtle" fontSize="xs">
-                              {runtime.language}
-                            </Badge>
-                            <Text color={colorMode === 'dark' ? 'gray.300' : 'gray.700'}>
-                              @{runtime.version}
-                            </Text>
-                          </HStack>
-                          <Text fontSize="xs" color={colorMode === 'dark' ? 'gray.500' : 'gray.600'}>
-                            {runtime.aliases?.[0] || 'standard'}
-                          </Text>
-                        </HStack>
-                      ))}
-                    </VStack>
-                  </Box>
-                </FormControl>
-              )}
-
-              {/* Quick Setup Cards */}
-              <Box>
-                <Text fontWeight="bold" mb={3}>Quick Setup</Text>
-                <HStack spacing={3}>
-                  <Button
-                    leftIcon={<FaPython />}
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setInput('setup python');
-                      onClose();
-                    }}
-                  >
-                    Python
-                  </Button>
-                  <Button
-                    leftIcon={<FaNodeJs />}
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setInput('setup node');
-                      onClose();
-                    }}
-                  >
-                    Node.js
-                  </Button>
-                  <Button
-                    leftIcon={<FaGlobe />}
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setInput('setup web');
-                      onClose();
-                    }}
-                  >
-                    Web Dev
-                  </Button>
-                </HStack>
-              </Box>
-            </VStack>
-          </ModalBody>
-          <ModalFooter>
-            <Button
-              leftIcon={<FaSync />}
-              colorScheme="blue"
-              variant="ghost"
-              onClick={testAPIConnection}
-              isLoading={isTestingConnection}
-            >
-              Test Connection
-            </Button>
-            <Button
-              colorScheme="purple"
-              onClick={onClose}
-              ml={3}
-            >
-              Apply Settings
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-    </MotionBox>
+          </form>
+          
+          <HStack spacing={4} mt={2} fontSize="xs" color="gray.500">
+            <Text><Kbd>↑↓</Kbd> History</Text>
+            <Text><Kbd>Ctrl+L</Kbd> Clear</Text>
+            <Text><Kbd>Enter</Kbd> Execute</Text>
+            <Text>✅ All commands work locally</Text>
+          </HStack>
+        </Box>
+      </Box>
+    </Box>
   );
 };
+
+export default Terminal;

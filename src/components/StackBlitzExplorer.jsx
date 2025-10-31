@@ -36,8 +36,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogContent,
-  AlertDialogOverlay,
-  Progress
+  AlertDialogOverlay
 } from '@chakra-ui/react';
 import {
   ChevronRightIcon,
@@ -59,9 +58,7 @@ import {
   FaSyncAlt,
   FaFileExport,
   FaArrowRight,
-  FaClone,
-  FaFileArchive,
-  FaShare
+  FaClone
 } from 'react-icons/fa';
 import { FILE_TYPES, getFileExtension, formatFileSize } from '../utils/fileSystem';
 
@@ -100,7 +97,7 @@ const getFileIcon = (filename, isFolder, isOpen, colorMode) => {
     'c': '#a8b9cc', 'php': '#777bb4', 'rb': '#cc0000', 'swift': '#fa7343',
     'kt': '#7f52ff', 'dart': '#0175c2', 'json': '#5a5a5a', 'yaml': '#cb171e',
     'yml': '#cb171e', 'xml': '#f60', 'sql': '#336791', 'md': '#083fa1',
-    'txt': '#718096', 'pdf': '#ff0000', 'zip': '#ff6b35'
+    'txt': '#718096', 'pdf': '#ff0000'
   };
 
   const fileColor = fileColors[ext] || '#718096';
@@ -316,21 +313,6 @@ const FILE_TYPE_OPTIONS = [
   { value: 'sh', label: 'Shell Script (.sh)' }
 ];
 
-// Helper function to count folders recursively
-const countFolders = (node) => {
-  if (node.type !== FILE_TYPES.FOLDER) return 0;
-  
-  let count = 1; // Count current folder
-  if (node.children) {
-    node.children.forEach(child => {
-      if (child.type === FILE_TYPES.FOLDER) {
-        count += countFolders(child);
-      }
-    });
-  }
-  return count;
-};
-
 // Main StackBlitz Explorer Component
 export const StackBlitzExplorer = ({
   fileSystem,
@@ -358,11 +340,6 @@ export const StackBlitzExplorer = ({
     onOpen: onMoveOpen,
     onClose: onMoveClose
   } = useDisclosure();
-  const {
-    isOpen: isShareOpen,
-    onOpen: onShareOpen,
-    onClose: onShareClose
-  } = useDisclosure();
 
   const [modalType, setModalType] = useState('');
   const [modalData, setModalData] = useState(null);
@@ -371,12 +348,9 @@ export const StackBlitzExplorer = ({
   const [exportType, setExportType] = useState('individual');
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [moveTarget, setMoveTarget] = useState(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
 
   const fileInputRef = useRef(null);
   const uploadAllInputRef = useRef(null);
-  const zipInputRef = useRef(null);
   const cancelRef = useRef();
   const explorerRef = useRef(null);
 
@@ -687,91 +661,6 @@ export const StackBlitzExplorer = ({
     uploadAllInputRef.current?.click();
   };
 
-  // ZIP Upload functionality
-  const handleZipUpload = async (event, parentId = null) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    if (!file.name.toLowerCase().endsWith('.zip')) {
-      toast({
-        title: "Invalid file",
-        description: "Please select a ZIP file",
-        status: "error",
-        duration: 3000
-      });
-      return;
-    }
-
-    setIsUploading(true);
-    setUploadProgress(0);
-
-    try {
-      const JSZip = (await import('jszip')).default;
-      const zip = new JSZip();
-      
-      const zipContent = await zip.loadAsync(file);
-      const targetFolderId = parentId || fileSystem.root.id;
-      let extractedCount = 0;
-      const totalFiles = Object.keys(zipContent.files).length;
-
-      // Recursive function to extract files and folders
-      const extractZipContents = async (zipFolder, currentPath = '', parentFolderId = targetFolderId) => {
-        const promises = [];
-        
-        for (const [relativePath, zipEntry] of Object.entries(zipFolder)) {
-          if (zipEntry.dir) {
-            // It's a directory
-            const folderName = zipEntry.name.split('/').filter(Boolean).pop();
-            try {
-              const newFolder = fileSystem.createFolder(parentFolderId, folderName);
-              await extractZipContents(zipFolder, zipEntry.name, newFolder.id);
-            } catch (error) {
-              console.warn(`Could not create folder ${folderName}:`, error);
-            }
-          } else {
-            // It's a file
-            promises.push(
-              zipEntry.async('text').then(content => {
-                try {
-                  const fileName = zipEntry.name.split('/').filter(Boolean).pop();
-                  fileSystem.createFile(parentFolderId, fileName, content);
-                  extractedCount++;
-                  setUploadProgress(Math.round((extractedCount / totalFiles) * 100));
-                } catch (error) {
-                  console.warn(`Could not create file ${zipEntry.name}:`, error);
-                }
-              })
-            );
-          }
-        }
-        
-        await Promise.all(promises);
-      };
-
-      await extractZipContents(zipContent.files);
-      
-      onFileSystemChange();
-      toast({
-        title: "ZIP extracted",
-        description: `${extractedCount} files extracted successfully`,
-        status: "success",
-        duration: 3000
-      });
-    } catch (error) {
-      console.error('Error extracting ZIP:', error);
-      toast({
-        title: "Extraction failed",
-        description: "Failed to extract ZIP file",
-        status: "error",
-        duration: 3000
-      });
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(0);
-      event.target.value = '';
-    }
-  };
-
   // Export functionality
   const handleExport = () => {
     onExportOpen();
@@ -780,6 +669,7 @@ export const StackBlitzExplorer = ({
   // New function to handle ZIP export
   const handleExportAsZip = async () => {
     try {
+      // Dynamically import jszip
       const JSZip = (await import('jszip')).default;
       const zip = new JSZip();
       
@@ -873,61 +763,6 @@ export const StackBlitzExplorer = ({
     onExportClose();
   };
 
-  // Share project functionality
-  const handleShareProject = () => {
-    onShareOpen();
-  };
-
-  const handleShareConfirm = async () => {
-    try {
-      // Count total folders
-      const totalFolders = countFolders(fileSystem.root);
-      const allFiles = fileSystem.getAllFiles();
-      const totalSize = allFiles.reduce((total, file) => total + file.size, 0);
-
-      // Create a JSON representation of the project
-      const projectData = {
-        name: "Shared Project",
-        files: allFiles.map(file => ({
-          name: file.name,
-          path: file.path,
-          content: file.content,
-          type: file.type
-        })),
-        timestamp: new Date().toISOString(),
-        version: "1.0"
-      };
-
-      // Convert to JSON string
-      const projectJSON = JSON.stringify(projectData, null, 2);
-      
-      // Create a temporary download link
-      const blob = new Blob([projectJSON], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `shared-project-${new Date().toISOString().split('T')[0]}.json`;
-      link.click();
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: "Project shared",
-        description: "Project file has been downloaded. Share this file with others.",
-        status: "success",
-        duration: 3000
-      });
-      
-      onShareClose();
-    } catch (error) {
-      toast({
-        title: "Share failed",
-        description: "Failed to create share file",
-        status: "error",
-        duration: 3000
-      });
-    }
-  };
-
   // Refresh functionality
   const handleRefresh = () => {
     onFileSystemChange();
@@ -958,11 +793,6 @@ export const StackBlitzExplorer = ({
     fileSystem.toggleFolder(folderId);
     onFileSystemChange();
   };
-
-  // Calculate project statistics for share modal
-  const allFiles = fileSystem.getAllFiles();
-  const totalSize = allFiles.reduce((total, file) => total + file.size, 0);
-  const totalFolders = countFolders(fileSystem.root);
 
   return (
     <>
@@ -999,7 +829,7 @@ export const StackBlitzExplorer = ({
               </MenuButton>
               <MenuList
                 zIndex={9999}
-                minW="220px"
+                minW="200px"
                 fontSize="sm"
               >
                 <MenuItem
@@ -1019,14 +849,9 @@ export const StackBlitzExplorer = ({
                 <MenuItem
                   icon={<FaUpload size={12} />}
                   onClick={() => fileInputRef.current?.click()}
+                  command="⌘U"
                 >
                   Upload Files
-                </MenuItem>
-                <MenuItem
-                  icon={<FaFileArchive size={12} />}
-                  onClick={() => zipInputRef.current?.click()}
-                >
-                  Upload ZIP
                 </MenuItem>
                 <MenuItem
                   icon={<FaDownload size={12} />}
@@ -1034,13 +859,6 @@ export const StackBlitzExplorer = ({
                   command="⌘E"
                 >
                   Export Project
-                </MenuItem>
-                <MenuItem
-                  icon={<FaShare size={12} />}
-                  onClick={handleShareProject}
-                  command="⌘S"
-                >
-                  Share Project
                 </MenuItem>
                 <Divider my={1} />
                 <MenuItem
@@ -1081,15 +899,6 @@ export const StackBlitzExplorer = ({
                   aria-label="Upload Files"
                 />
               </Tooltip>
-              <Tooltip label="Upload ZIP" placement="top">
-                <IconButton
-                  icon={<FaFileArchive size={12} />}
-                  size="xs"
-                  variant="ghost"
-                  onClick={() => zipInputRef.current?.click()}
-                  aria-label="Upload ZIP"
-                />
-              </Tooltip>
               <Tooltip label="Refresh" placement="top">
                 <IconButton
                   icon={<FaSyncAlt size={12} />}
@@ -1119,15 +928,6 @@ export const StackBlitzExplorer = ({
             />
           </InputGroup>
         </VStack>
-
-        {/* Upload Progress */}
-        {isUploading && (
-          <Box px={3} py={2} borderBottom="1px solid" borderColor={colorMode === 'dark' ? 'gray.600' : 'gray.200'}>
-            <Text fontSize="sm" mb={2}>Extracting ZIP file...</Text>
-            <Progress value={uploadProgress} size="sm" colorScheme="purple" borderRadius="full" />
-            <Text fontSize="xs" textAlign="center" mt={1}>{uploadProgress}%</Text>
-          </Box>
-        )}
 
         {/* File Tree */}
         <Box flex={1} overflow="auto" p={2}>
@@ -1164,14 +964,6 @@ export const StackBlitzExplorer = ({
           style={{ display: 'none' }}
           onChange={(e) => handleFileUpload(e)}
           multiple
-        />
-
-        <input
-          type="file"
-          ref={zipInputRef}
-          style={{ display: 'none' }}
-          onChange={handleZipUpload}
-          accept=".zip"
         />
 
         {/* Context Menu - FIXED POSITIONING */}
@@ -1228,18 +1020,6 @@ export const StackBlitzExplorer = ({
                     }}
                   >
                     Upload Files
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    justifyContent="flex-start"
-                    leftIcon={<FaFileArchive size={12} />}
-                    onClick={() => {
-                      zipInputRef.current?.click();
-                      closeContextMenu();
-                    }}
-                  >
-                    Upload ZIP
                   </Button>
                   <Button
                     variant="ghost"
@@ -1535,66 +1315,6 @@ export const StackBlitzExplorer = ({
                 leftIcon={<FaDownload />}
               >
                 {exportType === 'zip' ? 'Download ZIP' : 'Export Files'}
-              </Button>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
-
-        {/* Share Project Modal */}
-        <Modal isOpen={isShareOpen} onClose={onShareClose} size="md">
-          <ModalOverlay />
-          <ModalContent>
-            <ModalHeader>Share Project</ModalHeader>
-            <ModalCloseButton />
-            <ModalBody>
-              <VStack spacing={4} align="stretch">
-                <Box 
-                  p={3} 
-                  borderRadius="md" 
-                  bg={colorMode === 'dark' ? 'green.900' : 'green.50'}
-                  border="1px solid"
-                  borderColor={colorMode === 'dark' ? 'green.700' : 'green.200'}
-                >
-                  <Text fontSize="sm" fontWeight="medium" mb={2}>
-                    Share Your Project
-                  </Text>
-                  <Text fontSize="sm" color={colorMode === 'dark' ? 'green.200' : 'green.700'}>
-                    This will create a JSON file containing your entire project structure and file contents. 
-                    You can share this file with others who can then import it into their own editor.
-                  </Text>
-                </Box>
-
-                <Box>
-                  <Text fontSize="sm" fontWeight="medium" mb={2}>Project Summary:</Text>
-                  <VStack align="stretch" spacing={1}>
-                    <HStack justify="space-between">
-                      <Text fontSize="sm">Total Files:</Text>
-                      <Text fontSize="sm" fontWeight="bold">{allFiles.length}</Text>
-                    </HStack>
-                    <HStack justify="space-between">
-                      <Text fontSize="sm">Total Folders:</Text>
-                      <Text fontSize="sm" fontWeight="bold">{totalFolders}</Text>
-                    </HStack>
-                    <HStack justify="space-between">
-                      <Text fontSize="sm">Total Size:</Text>
-                      <Text fontSize="sm" fontWeight="bold">
-                        {formatFileSize(totalSize)}
-                      </Text>
-                    </HStack>
-                  </VStack>
-                </Box>
-              </VStack>
-            </ModalBody>
-            <ModalFooter>
-              <Button variant="ghost" mr={3} onClick={onShareClose}>
-                Cancel
-              </Button>
-              <Button
-                colorScheme="green"
-                onClick={handleShareConfirm}
-                leftIcon={<FaShare />}
-              >
-                Download Share File
               </Button>
             </ModalFooter>
           </ModalContent>
