@@ -426,15 +426,15 @@ export const StackBlitzExplorer = ({
 
   const handleCreate = () => {
     if (!newItemName.trim()) return;
-
+  
     try {
       if (modalType === 'file') {
         const fileName = newItemName.includes('.') ? newItemName : `${newItemName}.${fileType}`;
-        const file = fileSystem.createFile(modalData.parentId, fileName);
+        const file = fileSystem.createFile(modalData.parentId, fileName, '', true); // true = autoOpen
         onFileSelect(file.id);
         toast({
           title: "File created",
-          description: `${fileName} has been created`,
+          description: `${fileName} has been created and opened`,
           status: "success",
           duration: 2000
         });

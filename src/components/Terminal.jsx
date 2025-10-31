@@ -54,96 +54,46 @@ import {
   FaServer
 } from 'react-icons/fa';
 
-// Complete PowerShell-like Terminal Service - 100% Local
-class PowerShellTerminalService {
+// Piston API-based Terminal Service
+class PistonTerminalService {
   constructor() {
     this.sessions = new Map();
     this.commandHistory = [];
     this.maxHistorySize = 100;
     this.currentSessionId = null;
-    this.currentDirectory = 'C:\\Users\\CoderPoint';
-    this.user = 'CoderPoint';
-    this.hostname = 'PS-Terminal';
+    this.currentDirectory = '~/coderpoint';
+    this.user = 'coderpoint';
+    this.hostname = 'piston-terminal';
     
-    // File system simulation
-    this.fileSystem = {
-      'C:\\': ['Users', 'Windows', 'Program Files', 'autoexec.bat'],
-      'C:\\Users': ['CoderPoint', 'Public', 'Default'],
-      'C:\\Users\\CoderPoint': ['Documents', 'Projects', 'Downloads', 'Desktop', 'profile.ps1', 'README.md', 'package.json', 'index.js', 'app.py'],
-      'C:\\Users\\CoderPoint\\Documents': ['file1.txt', 'file2.docx'],
-      'C:\\Users\\CoderPoint\\Projects': ['my-app', 'website', 'database-project'],
-      'C:\\Users\\CoderPoint\\Downloads': ['setup.exe', 'document.pdf']
-    };
+    // Piston API configuration
+    this.pistonUrl = 'https://emkc.org/api/v2/piston';
     
-    this.fileContents = {
-      'profile.ps1': `# PowerShell Profile
-Write-Host "Welcome to CoderPoint Terminal!"
-function Get-MyInfo {
-    Write-Host "User: $env:USERNAME"
-    Write-Host "Directory: $(Get-Location)"
-}`,
-      'README.md': `# CoderPoint Terminal
-A powerful web-based terminal with full programming support.
-
-## Features:
-- Node.js, Python, npm support
-- Git commands
-- File system operations
-- Realistic command outputs`,
-      'package.json': `{
-  "name": "my-project",
-  "version": "1.0.0",
-  "description": "A sample Node.js project",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
-    "test": "jest"
-  },
-  "dependencies": {
-    "express": "^4.18.0",
-    "cors": "^2.8.5"
-  },
-  "devDependencies": {
-    "nodemon": "^2.0.0"
-  }
-}`,
-      'index.js': `const express = require('express');
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Hello from Node.js!',
-    timestamp: new Date().toISOString()
-  });
-});
-
-app.listen(PORT, () => {
-  console.log(\`🚀 Server running on port \${PORT}\`);
-  console.log(\`📡 Access at: http://localhost:\${PORT}\`);
-});`,
-      'app.py': `from flask import Flask, jsonify
-from datetime import datetime
-
-app = Flask(__name__)
-
-@app.route('/')
-def hello():
-    return jsonify({
-        'message': 'Hello from Python Flask!',
-        'timestamp': datetime.now().isoformat()
-    })
-
-if __name__ == '__main__':
-    print("Starting Flask server...")
-    app.run(debug=True, port=5000)`
+    // Supported languages and their Piston mappings
+    this.supportedLanguages = {
+      'javascript': { name: 'javascript', version: '18.15.0' },
+      'python': { name: 'python', version: '3.10.0' },
+      'python3': { name: 'python', version: '3.10.0' },
+      'node': { name: 'javascript', version: '18.15.0' },
+      'nodejs': { name: 'javascript', version: '18.15.0' },
+      'js': { name: 'javascript', version: '18.15.0' },
+      'java': { name: 'java', version: '15.0.2' },
+      'cpp': { name: 'cpp', version: '10.2.0' },
+      'c++': { name: 'cpp', version: '10.2.0' },
+      'c': { name: 'c', version: '10.2.0' },
+      'go': { name: 'go', version: '1.16.2' },
+      'rust': { name: 'rust', version: '1.68.2' },
+      'php': { name: 'php', version: '8.2.3' },
+      'ruby': { name: 'ruby', version: '3.0.1' },
+      'typescript': { name: 'typescript', version: '5.0.3' },
+      'ts': { name: 'typescript', version: '5.0.3' },
+      'bash': { name: 'bash', version: '5.2.0' },
+      'shell': { name: 'bash', version: '5.2.0' }
     };
   }
 
   // Initialize session
-  async createSession(language = 'powershell') {
-    const sessionId = `ps_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  async createSession(language = 'bash') {
+    const sessionId = `piston_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     const session = {
       id: sessionId,
@@ -154,19 +104,18 @@ if __name__ == '__main__':
       user: this.user,
       hostname: this.hostname,
       environment: {
-        PATH: 'C:\\Windows\\System32;C:\\Program Files\\NodeJS\\;C:\\Python39\\;C:\\Program Files\\Git\\cmd',
-        NODE_ENV: 'development',
-        PYTHONPATH: 'C:\\Python39\\Lib',
-        USER: 'CoderPoint',
-        COMPUTERNAME: 'CODERPOINT-PC'
+        PATH: '/usr/local/bin:/usr/bin:/bin',
+        HOME: '/home/coderpoint',
+        USER: 'coderpoint',
+        LANG: 'en_US.UTF-8'
       },
-      processes: [],
-      services: [
-        { name: 'TermService', status: 'Running', displayName: 'Remote Desktop Services' },
-        { name: 'AudioSrv', status: 'Running', displayName: 'Windows Audio' },
-        { name: 'BITS', status: 'Running', displayName: 'Background Intelligent Transfer' },
-        { name: 'Spooler', status: 'Running', displayName: 'Print Spooler' }
-      ]
+      files: {
+        'README.md': '# Welcome to Piston Terminal\nA web-based terminal with Code execution via Cloud API.',
+        'hello.js': 'console.log("Hello from Node.js!");',
+        'hello.py': 'print("Hello from Python!")',
+        'hello.java': 'public class HelloWorld {\n    public static void main(String[] args) {\n        System.out.println("Hello from Java!");\n    }\n}',
+        'example.cpp': '#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello from C++!" << endl;\n    return 0;\n}'
+      }
     };
 
     this.sessions.set(sessionId, session);
@@ -174,14 +123,14 @@ if __name__ == '__main__':
 
     session.history.push({
       type: 'welcome',
-      content: `Windows PowerShell
-Copyright (C) Microsoft Corporation. All rights reserved.
+      content: `🚀 Cloud Terminal
+      
+✅ Connected With Cloud
 
-✅ ENHANCED LOCAL MODE - Full Command Support
-💻 Type 'help' for available commands
-🚀 Programming: Node.js, Python, npm, git, docker
+Type 'help' for available commands
+Type 'languages' to see supported languages
 
-PS ${this.currentDirectory}>`,
+${this.user}@${this.hostname}:${this.currentDirectory}$`,
       timestamp: new Date()
     });
 
@@ -198,7 +147,61 @@ PS ${this.currentDirectory}>`,
     }
   }
 
-  // Main command execution - 100% Local
+  // Execute code via Piston API
+  async executeCode(language, code, args = []) {
+    try {
+      const langConfig = this.supportedLanguages[language];
+      if (!langConfig) {
+        throw new Error(`Language '${language}' not supported`);
+      }
+
+      const response = await fetch(`${this.pistonUrl}/execute`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          language: langConfig.name,
+          version: langConfig.version,
+          files: [{ content: code }],
+          args: args
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Cloud API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return {
+        output: data.run.stdout || data.run.stderr || '(No output)',
+        success: !data.run.stderr,
+        exitCode: data.run.code
+      };
+    } catch (error) {
+      throw new Error(`Execution failed: ${error.message}`);
+    }
+  }
+
+  // Get supported languages from Piston
+  async getAvailableLanguages() {
+    try {
+      const response = await fetch(`${this.pistonUrl}/runtimes`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch languages');
+      }
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      // Fallback to known languages if API fails
+      return Object.values(this.supportedLanguages).map(lang => ({
+        language: lang.name,
+        version: lang.version
+      }));
+    }
+  }
+
+  // Main command execution
   async executeCommand(sessionId, command) {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error('Session not found');
@@ -210,13 +213,13 @@ PS ${this.currentDirectory}>`,
 
     session.history.push({
       type: 'input',
-      content: `PS ${session.currentDirectory}> ${trimmedCommand}`,
+      content: `${session.user}@${session.hostname}:${session.currentDirectory}$ ${trimmedCommand}`,
       timestamp: new Date(),
       rawCommand: trimmedCommand
     });
 
     try {
-      const result = await this.processLocalCommand(session, trimmedCommand);
+      const result = await this.processCommand(session, trimmedCommand);
       
       session.history.push({
         type: 'output',
@@ -224,10 +227,6 @@ PS ${this.currentDirectory}>`,
         timestamp: new Date(),
         success: result.success
       });
-
-      if (result.newDirectory) {
-        session.currentDirectory = result.newDirectory;
-      }
 
       return result;
     } catch (error) {
@@ -243,787 +242,182 @@ PS ${this.currentDirectory}>`,
     }
   }
 
-  // Process ALL commands locally
-  async processLocalCommand(session, command) {
+  // Process commands
+  async processCommand(session, command) {
     const lowerCommand = command.toLowerCase().trim();
     const args = command.split(' ').slice(1);
     const fullArgs = command.split(' ');
 
-    // ==================== COMMAND MAPPING ====================
-    const commandMap = {
-      // File System Commands
-      'mkdir': () => this.handleMkdir(session, args),
-      'md': () => this.handleMkdir(session, args),
-      'rmdir': () => this.handleRmdir(session, args),
-      'rd': () => this.handleRmdir(session, args),
-      'copy': () => this.handleCopy(session, args),
-      'cp': () => this.handleCopy(session, args),
-      'xcopy': () => this.handleXcopy(session, args),
-      'move': () => this.handleMove(session, args),
-      'mv': () => this.handleMove(session, args),
-      'ren': () => this.handleRename(session, args),
-      'rename': () => this.handleRename(session, args),
-      'del': () => this.handleDel(session, args),
-      'rm': () => this.handleDel(session, args),
-      'erase': () => this.handleDel(session, args),
-      'type': () => this.handleType(session, args),
-      'cat': () => this.handleType(session, args),
-      'more': () => this.handleMore(session, args),
-      
-      // Directory Commands
-      'dir': () => this.handleDir(session),
-      'ls': () => this.handleDir(session),
-      'ls -la': () => this.handleDirDetailed(session),
-      'ls -l': () => this.handleDirDetailed(session),
-      'cd': () => this.handleCd(session, args),
-      'chdir': () => this.handleCd(session, args),
-      'pwd': () => this.handlePwd(session),
-      
-      // System Commands
-      'cls': () => this.handleClear(session),
-      'clear': () => this.handleClear(session),
-      'ver': () => this.handleVer(),
-      'time': () => this.handleTime(),
-      'date': () => this.handleDate(),
-      'echo': () => this.handleEcho(args),
-      'set': () => this.handleSet(session, args),
-      'path': () => this.handlePath(session),
-      'env': () => this.handleEnv(session),
-      
-      // Network Commands
-      'ping': () => this.handlePing(args),
-      'ipconfig': () => this.handleIpconfig(),
-      'tracert': () => this.handleTracert(args),
-      'netstat': () => this.handleNetstat(),
-      'nslookup': () => this.handleNslookup(args),
-      'curl': () => this.handleCurl(args),
-      'wget': () => this.handleWget(args),
-      
-      // System Info Commands
-      'systeminfo': () => this.handleSystemInfo(),
-      'tasklist': () => this.handleTasklist(),
-      'taskkill': () => this.handleTaskkill(args),
-      'whoami': () => this.handleWhoami(),
-      'hostname': () => this.handleHostname(),
-
-      // Programming Commands - Node.js
-      'node': () => this.handleNode(session, args),
-      'node --version': () => this.handleNodeVersion(),
-      'node -v': () => this.handleNodeVersion(),
-      'npm': () => this.handleNpm(args),
-      'npm --version': () => this.handleNpmVersion(),
-      'npm -v': () => this.handleNpmVersion(),
-      'npx': () => this.handleNpx(args),
-      'yarn': () => this.handleYarn(args),
-      
-      // Programming Commands - Python
-      'python': () => this.handlePython(session, args),
-      'python --version': () => this.handlePythonVersion(),
-      'python -v': () => this.handlePythonVersion(),
-      'py': () => this.handlePython(session, args),
-      'python3': () => this.handlePython(session, args),
-      'pip': () => this.handlePip(args),
-      'pip --version': () => this.handlePipVersion(),
-      
-      // Development Tools
-      'git': () => this.handleGit(args),
-      'git --version': () => this.handleGitVersion(),
-      'docker': () => this.handleDocker(args),
-      'docker --version': () => this.handleDockerVersion(),
-      
-      // PowerShell Commands
-      'help': () => this.handleHelp(),
-      'get-help': () => this.handleHelp(),
-      'get-command': () => this.handleGetCommand(),
-      'get-date': () => this.handleGetDate(),
-      'get-location': () => this.handlePwd(session),
-      'set-location': () => this.handleCd(session, args),
-      'get-childitem': () => this.handleDir(session),
-      'get-history': () => this.handleGetHistory(),
-      'clear-host': () => this.handleClear(session),
-      'write-host': () => this.handleEcho(args),
-      'test-connection': () => this.handlePing(args),
-      'get-service': () => this.handleGetService(session),
-      'get-process': () => this.handleGetProcess(session),
-      'get-item': () => this.handleGetItem(session, args),
-      'new-item': () => this.handleMkdir(session, args),
-      'remove-item': () => this.handleDel(session, args),
-      'copy-item': () => this.handleCopy(session, args),
-      'move-item': () => this.handleMove(session, args),
-      'get-content': () => this.handleType(session, args),
-      'invoke-webrequest': () => this.handleCurl(args)
-    };
-
-    // Find and execute command
-    for (const [cmd, handler] of Object.entries(commandMap)) {
-      if (lowerCommand === cmd.toLowerCase() || lowerCommand.startsWith(cmd.toLowerCase() + ' ')) {
-        return handler();
-      }
+    // Built-in commands
+    if (lowerCommand === 'help' || lowerCommand === '--help') {
+      return { output: this.getHelpText(), success: true };
     }
 
-    // Special code execution for imports and scripts
-    if (this.isCodeCommand(command)) {
-      return this.handleCodeExecution(command);
+    if (lowerCommand === 'languages' || lowerCommand === 'langs') {
+      const languages = await this.getAvailableLanguages();
+      let output = 'Available languages:\n\n';
+      languages.forEach(lang => {
+        output += `  ${lang.language} (${lang.version})\n`;
+      });
+      output += '\nUsage: node <file.js> | python <file.py> | java <file.java> | etc.';
+      return { output, success: true };
     }
 
-    // Command not found
-    return {
-      output: `The term '${fullArgs[0]}' is not recognized as the name of a cmdlet, function, script file, or operable program.\nCheck the spelling of the name, or if a path was included, verify that the path is correct and try again.`,
-      success: false
-    };
-  }
-
-  // ==================== COMMAND HANDLERS ====================
-
-  // File System Commands
-  handleMkdir(session, args) {
-    if (!args[0]) {
-      return { output: 'The syntax of the command is incorrect.', success: false };
+    if (lowerCommand === 'clear' || lowerCommand === 'cls') {
+      session.history = session.history.filter(item => item.type === 'welcome');
+      return { output: '', success: true };
     }
-    const dirName = args[0];
-    if (!this.fileSystem[session.currentDirectory]) {
-      this.fileSystem[session.currentDirectory] = [];
-    }
-    this.fileSystem[session.currentDirectory].push(dirName);
-    this.fileSystem[`${session.currentDirectory}\\${dirName}`] = [];
-    return { output: `    Directory: ${session.currentDirectory}\n\nMode                LastWriteTime         Length Name\n----                -------------         ------ ----\nd-----        ${new Date().toLocaleDateString()}   ${new Date().toLocaleTimeString()}                ${dirName}`, success: true };
-  }
 
-  handleRmdir(session, args) {
-    if (!args[0]) {
-      return { output: 'The syntax of the command is incorrect.', success: false };
-    }
-    const dirName = args[0];
-    if (this.fileSystem[session.currentDirectory]) {
-      this.fileSystem[session.currentDirectory] = this.fileSystem[session.currentDirectory].filter(item => item !== dirName);
-      delete this.fileSystem[`${session.currentDirectory}\\${dirName}`];
-    }
-    return { output: `Removed directory: ${dirName}`, success: true };
-  }
-
-  handleCopy(session, args) {
-    if (args.length < 2) {
-      return { output: 'The syntax of the command is incorrect.', success: false };
-    }
-    return { output: `        1 file(s) copied.`, success: true };
-  }
-
-  handleXcopy(session, args) {
-    return { output: `Copied files and directories`, success: true };
-  }
-
-  handleMove(session, args) {
-    if (args.length < 2) {
-      return { output: 'The syntax of the command is incorrect.', success: false };
-    }
-    return { output: `        1 file(s) moved.`, success: true };
-  }
-
-  handleRename(session, args) {
-    if (args.length < 2) {
-      return { output: 'The syntax of the command is incorrect.', success: false };
-    }
-    return { output: `File renamed successfully`, success: true };
-  }
-
-  handleDel(session, args) {
-    if (!args[0]) {
-      return { output: 'The syntax of the command is incorrect.', success: false };
-    }
-    return { output: `File deleted: ${args[0]}`, success: true };
-  }
-
-  handleType(session, args) {
-    if (!args[0]) {
-      return { output: 'The syntax of the command is incorrect.', success: false };
-    }
-    
-    const fileName = args[0];
-    const content = this.fileContents[fileName] || `Content of ${fileName}\nThis is a simulated file content for demonstration.`;
-    return { output: content, success: true };
-  }
-
-  handleMore(session, args) {
-    return this.handleType(session, args);
-  }
-
-  handleDir(session) {
-    const files = this.fileSystem[session.currentDirectory] || [];
-    let output = `    Directory: ${session.currentDirectory}\n\nMode                LastWriteTime         Length Name\n----                -------------         ------ ----\n`;
-    
-    files.forEach(file => {
-      const isDir = !file.includes('.');
-      const mode = isDir ? 'd-----' : '-a----';
-      output += `${mode}       ${new Date().toLocaleDateString()}   ${new Date().toLocaleTimeString()}          ${isDir ? '' : '1024'} ${file}${isDir ? '\\' : ''}\n`;
-    });
-    
-    output += `\n    Total Files: ${files.length}`;
-    return { output, success: true };
-  }
-
-  handleDirDetailed(session) {
-    const files = this.fileSystem[session.currentDirectory] || [];
-    let output = `total ${files.length}\n`;
-    
-    files.forEach(file => {
-      const isDir = !file.includes('.');
-      output += `${isDir ? 'd' : '-'}rwxr-xr-x 1 ${this.user} ${this.user} ${isDir ? '4096' : '1024'} Dec  1 15:23 ${file}\n`;
-    });
-    
-    return { output, success: true };
-  }
-
-  handleCd(session, args) {
-    const path = args[0];
-    
-    if (!path) {
+    if (lowerCommand === 'pwd') {
       return { output: session.currentDirectory, success: true };
     }
-    
-    let newDirectory = session.currentDirectory;
-    
-    if (path === '..') {
-      const parts = session.currentDirectory.split('\\').filter(p => p);
-      if (parts.length > 1) {
-        parts.pop();
-        newDirectory = parts.join('\\') || 'C:\\';
+
+    if (lowerCommand === 'whoami') {
+      return { output: session.user, success: true };
+    }
+
+    if (lowerCommand === 'hostname') {
+      return { output: session.hostname, success: true };
+    }
+
+    if (lowerCommand === 'ls' || lowerCommand === 'dir') {
+      const files = Object.keys(session.files);
+      let output = 'Files in current directory:\n\n';
+      files.forEach(file => {
+        output += `  ${file}\n`;
+      });
+      output += `\nTotal: ${files.length} files`;
+      return { output, success: true };
+    }
+
+    if (lowerCommand === 'history') {
+      if (this.commandHistory.length === 0) {
+        return { output: 'No command history', success: true };
       }
-    } else if (path === '\\' || path === '/') {
-      newDirectory = 'C:\\';
-    } else if (path === '~' || path === '$home') {
-      newDirectory = 'C:\\Users\\CoderPoint';
-    } else if (path.match(/^[a-zA-Z]:[\\\/]/)) {
-      newDirectory = path.replace(/\//g, '\\');
-    } else {
-      newDirectory = `${session.currentDirectory}\\${path}`.replace(/\\\\/g, '\\');
-    }
-    
-    // Validate directory exists
-    if (!this.fileSystem[newDirectory] && newDirectory !== 'C:\\') {
-      return { output: `Cannot find path '${newDirectory}' because it does not exist.`, success: false };
-    }
-    
-    return { output: '', success: true, newDirectory };
-  }
-
-  handlePwd(session) {
-    return { output: session.currentDirectory, success: true };
-  }
-
-  handleClear(session) {
-    session.history = session.history.filter(item => item.type === 'welcome');
-    return { output: '', success: true };
-  }
-
-  handleVer() {
-    return { output: 'Microsoft Windows [Version 10.0.19045.3693]', success: true };
-  }
-
-  handleTime() {
-    return { output: `The current time is: ${new Date().toLocaleTimeString()}`, success: true };
-  }
-
-  handleDate() {
-    return { output: `The current date is: ${new Date().toLocaleDateString()}`, success: true };
-  }
-
-  handleEcho(args) {
-    return { output: args.join(' '), success: true };
-  }
-
-  handleSet(session, args) {
-    if (args.length === 0) {
-      let output = '';
-      Object.keys(session.environment).forEach(key => {
-        output += `${key}=${session.environment[key]}\n`;
+      let output = 'Command history:\n\n';
+      this.commandHistory.slice().reverse().forEach((cmd, index) => {
+        output += `  ${(index + 1).toString().padStart(3)}  ${cmd}\n`;
       });
       return { output, success: true };
     }
-    
-    const [key, value] = args[0].split('=');
-    if (key && value) {
-      session.environment[key] = value;
-      return { output: '', success: true };
-    }
-    
-    return { output: 'Invalid syntax. Use: SET variable=value', success: false };
-  }
 
-  handlePath(session) {
-    return { output: `PATH=${session.environment.PATH}`, success: true };
-  }
-
-  handleEnv(session) {
-    return this.handleSet(session, []);
-  }
-
-  handlePing(args) {
-    const host = args[0] || 'google.com';
-    return { 
-      output: `Pinging ${host} with 32 bytes of data:\nReply from ${host}: bytes=32 time=15ms TTL=55\nReply from ${host}: bytes=32 time=12ms TTL=55\nReply from ${host}: bytes=32 time=18ms TTL=55\nReply from ${host}: bytes=32 time=14ms TTL=55\n\nPing statistics for ${host}:\n    Packets: Sent = 4, Received = 4, Lost = 0 (0% loss)`,
-      success: true 
-    };
-  }
-
-  handleIpconfig() {
-    return {
-      output: `Windows IP Configuration
-
-Ethernet adapter Ethernet:
-
-   Connection-specific DNS Suffix  . : home
-   IPv4 Address. . . . . . . . . . . : 192.168.1.100
-   Subnet Mask . . . . . . . . . . . : 255.255.255.0
-   Default Gateway . . . . . . . . . : 192.168.1.1`,
-      success: true
-    };
-  }
-
-  handleTracert(args) {
-    const host = args[0] || 'google.com';
-    return {
-      output: `Tracing route to ${host} over a maximum of 30 hops:\n\n  1    10 ms    12 ms    15 ms  router.local [192.168.1.1]\n  2    25 ms    28 ms    30 ms  142.251.32.46`,
-      success: true
-    };
-  }
-
-  handleNetstat() {
-    return {
-      output: `Active Connections
-
-  Proto  Local Address          Foreign Address        State
-  TCP    192.168.1.100:49352    123.45.67.89:443      ESTABLISHED
-  TCP    192.168.1.100:49353    234.56.78.90:80       TIME_WAIT`,
-      success: true
-    };
-  }
-
-  handleNslookup(args) {
-    const host = args[0] || 'google.com';
-    return {
-      output: `Server:  router.local\nAddress:  192.168.1.1\n\nNon-authoritative answer:\nName:    ${host}\nAddress:  142.251.32.46`,
-      success: true
-    };
-  }
-
-  handleCurl(args) {
-    const url = args[0] || 'https://api.github.com';
-    return {
-      output: `{\n  "message": "API response from ${url}",\n  "status": "success",\n  "data": "Simulated response from CoderPoint Terminal"\n}`,
-      success: true
-    };
-  }
-
-  handleWget(args) {
-    const url = args[0] || 'https://example.com';
-    return {
-      output: `--2023-12-01 15:23:45--  ${url}\nResolving example.com... 93.184.216.34\nConnecting to example.com|93.184.216.34|:443... connected.\nHTTP request sent, awaiting response... 200 OK\nLength: 1256 (1.2K) [text/html]\nSaving to: 'index.html'\n\n100%[======================================>] 1,256       --.-K/s   in 0s\n\n2023-12-01 15:23:45 (125 MB/s) - 'index.html' saved [1256/1256]`,
-      success: true
-    };
-  }
-
-  handleSystemInfo() {
-    return {
-      output: `Host Name:                 CODERPOINT-PC
-OS Name:                   Microsoft Windows 10 Pro
-OS Version:                10.0.19045 N/A Build 19045
-OS Manufacturer:           Microsoft Corporation
-OS Configuration:          Standalone Workstation
-Registered Owner:          CoderPoint
-Processor(s):              1 Processor(s) Installed.
-                           [01]: Intel64 Family 6 Model 158 Stepping 10 GenuineIntel ~2900 Mhz
-Total Physical Memory:     16,384 MB
-Available Physical Memory: 8,192 MB`,
-      success: true
-    };
-  }
-
-  handleTasklist() {
-    return {
-      output: `Image Name                     PID Session Name        Session#    Mem Usage
-========================= ======== ================ ========== ============
-System Idle Process              0 Services                   0          8 K
-System                           4 Services                   0      9,628 K
-Code.exe                      12345 Console                    1    245,672 K
-node.exe                       6789 Console                    1     89,456 K
-python.exe                     9012 Console                    1     67,890 K`,
-      success: true
-    };
-  }
-
-  handleTaskkill(args) {
-    if (!args[0]) {
-      return { output: 'ERROR: The process "0" not found.', success: false };
-    }
-    return { output: `SUCCESS: Sent termination signal to process ${args[0]}.`, success: true };
-  }
-
-  handleWhoami() {
-    return { output: 'coderpoint-pc\\coderpoint', success: true };
-  }
-
-  handleHostname() {
-    return { output: 'CODERPOINT-PC', success: true };
-  }
-
-  handleGetItem(session, args) {
-    const item = args[0] || '.';
-    return {
-      output: `    Directory: ${session.currentDirectory}
-
-Mode                LastWriteTime         Length Name
-----                -------------         ------ ----
--a----       12/1/2023   1:23 PM           1024  ${item}`,
-      success: true
-    };
-  }
-
-  handleGetService(session) {
-    let output = `Status   Name               DisplayName\n------   ----               -----------\n`;
-    session.services.forEach(service => {
-      output += `${service.status.padEnd(8)} ${service.name.padEnd(18)} ${service.displayName}\n`;
-    });
-    return { output, success: true };
-  }
-
-  handleGetProcess(session) {
-    return {
-      output: `Handles  NPM(K)    PM(K)      WS(K)     CPU(s)     Id  SI ProcessName
--------  ------    -----      -----     ------     --  -- -----------
-    123       15     1024       2048       1.23   1234   1 Code
-     89       12      768       1536       0.89   5678   1 Terminal
-     67        8      512       1024       0.45   9012   1 Node`,
-      success: true
-    };
-  }
-
-  // Programming Commands
-  handleNode(session, args) {
-    if (args.length === 0) {
-      return { 
-        output: `Welcome to Node.js v18.17.0.\nType ".help" for more information.\n>`, 
-        success: true 
-      };
+    // Code execution commands
+    const executionMatch = command.match(/^(node|python|python3|js|java|cpp|g\+\+|gcc|go|rust|php|ruby|typescript|ts)\s+(.+)$/);
+    if (executionMatch) {
+      const language = executionMatch[1];
+      const codeOrFile = executionMatch[2];
+      
+      // Check if it's a file in session
+      if (session.files[codeOrFile]) {
+        return await this.executeCode(language, session.files[codeOrFile]);
+      } else {
+        // Treat as inline code
+        return await this.executeCode(language, codeOrFile);
+      }
     }
 
-    if (args[0] === '--version' || args[0] === '-v') {
-      return { output: 'v18.17.0', success: true };
-    }
-
-    const file = args[0];
-    const simulations = {
-      'index.js': `🚀 Server running on port 3000\n📡 Access at: http://localhost:3000\n{"message":"Hello from Node.js!","timestamp":"2023-12-01T15:23:45.123Z"}`,
-      'app.js': `Application started successfully!\nConnected to database.\nServer listening on port 8080`,
-      'server.js': `HTTP server listening on port 8080\nREST API endpoints registered.\nDatabase connection established.`
-    };
-
-    const output = simulations[file] || `Executed ${file} with Node.js\nOutput: Script executed successfully`;
-    return { output, success: true };
-  }
-
-  handleNodeVersion() {
-    return { output: 'v18.17.0', success: true };
-  }
-
-  handleNpm(args) {
-    if (args.length === 0) {
-      return { output: 'Usage: npm <command>\n\nwhere <command> is one of:\n    install, start, run, test, publish, etc.', success: true };
-    }
-
-    const command = args[0];
-    const packages = args.slice(1);
-
-    switch (command) {
-      case 'install':
-        return { 
-          output: `added ${packages.length} package${packages.length !== 1 ? 's' : ''}, and audited 1 package in 2s\n\nfound 0 vulnerabilities`, 
-          success: true 
+    // Direct file execution
+    const fileMatch = command.match(/^\.\/(\S+)$/);
+    if (fileMatch) {
+      const filename = fileMatch[1];
+      if (session.files[filename]) {
+        const fileContent = session.files[filename];
+        const fileExt = filename.split('.').pop();
+        const langMap = {
+          'js': 'javascript',
+          'py': 'python',
+          'java': 'java',
+          'cpp': 'cpp',
+          'c': 'c',
+          'go': 'go',
+          'rs': 'rust',
+          'php': 'php',
+          'rb': 'ruby',
+          'ts': 'typescript'
         };
-      case 'start':
-        return { output: `> my-app@1.0.0 start\n> node index.js\n\n🚀 Server running on port 3000`, success: true };
-      case 'run':
-        const script = args[1] || 'dev';
-        return { output: `> my-app@1.0.0 ${script}\n> nodemon index.js\n\n[nodemon] watching path(s): *.*\n[nodemon] watching extensions: js,mjs,json`, success: true };
-      case '--version':
-      case '-v':
-        return { output: '9.6.7', success: true };
-      case 'init':
-        return { output: 'Initialized empty npm package in ./package.json', success: true };
-      case 'test':
-        return { output: 'All tests passed! (5 tests, 5 passed, 0 failed)', success: true };
-      default:
-        return { output: `npm ${command} executed successfully`, success: true };
-    }
-  }
-
-  handleNpmVersion() {
-    return { output: '9.6.7', success: true };
-  }
-
-  handleNpx(args) {
-    if (args[0] === 'create-react-app') {
-      return { 
-        output: `Creating a new React app in ./my-app.\n\nInstalling packages. This might take a couple of minutes.\nInstalling react, react-dom, and react-scripts...\n\n✅ Success! Created my-app at ${this.currentDirectory}\\my-app\n📁 Inside that directory, you can run several commands:\n\n  npm start\n    Starts the development server.\n\n  npm run build\n    Bundles the app into static files for production.\n\nWe suggest that you begin by typing:\n\n  cd my-app\n  npm start\n\nHappy hacking!`,
-        success: true 
-      };
-    }
-    return { output: `npx ${args.join(' ')} executed successfully`, success: true };
-  }
-
-  handleYarn(args) {
-    if (args[0] === 'add') {
-      return { output: 'success Saved lockfile.\nsuccess Saved 1 new dependency.', success: true };
-    }
-    return { output: `yarn ${args.join(' ')} executed successfully`, success: true };
-  }
-
-  handlePython(session, args) {
-    if (args.length === 0) {
-      return { 
-        output: `Python 3.9.0 (default, Oct  6 2023, 10:45:02)\n[Clang 12.0.0 ] on win32\nType "help", "copyright", "credits" or "license" for more information.\n>>>`, 
-        success: true 
-      };
+        
+        const language = langMap[fileExt];
+        if (language) {
+          return await this.executeCode(language, fileContent);
+        } else {
+          return { output: `Cannot execute ${filename}: Unsupported file type`, success: false };
+        }
+      } else {
+        return { output: `File not found: ${filename}`, success: false };
+      }
     }
 
-    if (args[0] === '--version' || args[0] === '-v') {
-      return { output: 'Python 3.9.0', success: true };
+    // Cat command to show file content
+    if (command.startsWith('cat ')) {
+      const filename = args[0];
+      if (session.files[filename]) {
+        return { output: session.files[filename], success: true };
+      } else {
+        return { output: `File not found: ${filename}`, success: false };
+      }
     }
 
-    const file = args[0];
-    const simulations = {
-      'app.py': ` * Serving Flask app 'app'\n * Debug mode: on\n * Running on http://127.0.0.1:5000\n * Restarting with stat\n{"message":"Hello from Python Flask!","timestamp":"2023-12-01T15:23:45.123456"}`,
-      'script.py': `Hello, World!\nCalculation completed: 42\nData processed successfully!`,
-      'main.py': `Data processed successfully!\nResults saved to output.json\nMachine learning model trained.`
+    // Echo command
+    if (command.startsWith('echo ')) {
+      return { output: args.join(' '), success: true };
+    }
+
+    // If no built-in command matches, try to execute as bash script
+    if (!command.includes(' ')) {
+      // Single word commands that might be bash scripts
+      return await this.executeCode('bash', command);
+    }
+
+    // Default: command not found
+    return {
+      output: `Command not found: ${fullArgs[0]}\nType 'help' for available commands.`,
+      success: false
     };
-
-    const output = simulations[file] || `Executed ${file} with Python\nOutput: Script executed successfully`;
-    return { output, success: true };
-  }
-
-  handlePythonVersion() {
-    return { output: 'Python 3.9.0', success: true };
-  }
-
-  handlePip(args) {
-    if (args[0] === 'install') {
-      const packages = args.slice(1);
-      return { 
-        output: `Collecting ${packages.join(', ')}\n  Downloading ${packages[0]}-1.0.0-py3-none-any.whl (15 kB)\nInstalling collected packages: ${packages.join(', ')}\nSuccessfully installed ${packages.join(' ')}`, 
-        success: true 
-      };
-    }
-    if (args[0] === '--version') {
-      return { output: 'pip 23.2.1 from C:\\Python39\\lib\\site-packages\\pip (python 3.9)', success: true };
-    }
-    return { output: `pip ${args.join(' ')} executed successfully`, success: true };
-  }
-
-  handlePipVersion() {
-    return { output: 'pip 23.2.1 from C:\\Python39\\lib\\site-packages\\pip (python 3.9)', success: true };
-  }
-
-  handleGit(args) {
-    if (args.length === 0) {
-      return { output: 'usage: git [--version] [--help] [-C <path>] [-c <name>=<value>]\n           [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]\n           [-p | --paginate | -P | --no-pager] [--no-replace-objects] [--bare]\n           [--git-dir=<path>] [--work-tree=<path>] [--namespace=<name>]\n           <command> [<args>]', success: true };
-    }
-
-    const command = args[0];
-    switch (command) {
-      case 'clone':
-        return { output: 'Cloning into repository...\nReceiving objects: 100% (125/125), 45.67 MiB | 2.34 MiB/s, done.\nResolving deltas: 100% (65/65), done.', success: true };
-      case 'status':
-        return { output: 'On branch main\nYour branch is up to date with origin/main.\n\nnothing to commit, working tree clean', success: true };
-      case 'pull':
-        return { output: 'Already up to date.', success: true };
-      case 'push':
-        return { output: 'Everything up-to-date', success: true };
-      case 'log':
-        return { output: 'commit abc123def456 (HEAD -> main)\nAuthor: CoderPoint <coder@point.com>\nDate:   Fri Dec 1 15:23:45 2023 +0000\n\n    Initial commit', success: true };
-      case '--version':
-        return { output: 'git version 2.39.2.windows.1', success: true };
-      default:
-        return { output: `git ${command} executed successfully`, success: true };
-    }
-  }
-
-  handleGitVersion() {
-    return { output: 'git version 2.39.2.windows.1', success: true };
-  }
-
-  handleDocker(args) {
-    if (args[0] === '--version') {
-      return { output: 'Docker version 24.0.6, build ed223bc', success: true };
-    }
-    if (args[0] === 'ps') {
-      return { output: 'CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES', success: true };
-    }
-    if (args[0] === 'run') {
-      return { output: 'Unable to find image locally\nPulling from library/nginx\nDigest: sha256:abc123\nStatus: Downloaded newer image\nContainer started successfully', success: true };
-    }
-    return { output: `docker ${args.join(' ')} executed successfully`, success: true };
-  }
-
-  handleDockerVersion() {
-    return { output: 'Docker version 24.0.6, build ed223bc', success: true };
-  }
-
-  // PowerShell Commands
-  handleHelp() {
-    return { output: this.getHelpText(), success: true };
-  }
-
-  handleGetCommand() {
-    return { output: this.getAvailableCommands(), success: true };
-  }
-
-  handleGetDate() {
-    return { output: new Date().toString(), success: true };
-  }
-
-  handleGetHistory() {
-    if (this.commandHistory.length === 0) {
-      return { output: 'No command history available.', success: true };
-    }
-
-    let output = 'Id CommandLine\n-- -----------\n';
-    this.commandHistory.slice().reverse().forEach((cmd, index) => {
-      output += `${(index + 1).toString().padStart(2)} ${cmd}\n`;
-    });
-
-    return { output, success: true };
-  }
-
-  // Code Execution
-  isCodeCommand(command) {
-    const codePatterns = [
-      /import\s+/,
-      /require\(/,
-      /from\s+/,
-      /console\.log/,
-      /print\(/,
-      /function\s+/,
-      /def\s+/,
-      /class\s+/,
-      /=>/,
-      /const\s+/,
-      /let\s+/,
-      /var\s+/
-    ];
-    
-    return codePatterns.some(pattern => pattern.test(command));
-  }
-
-  handleCodeExecution(command) {
-    let output = 'Code executed successfully:\n\n';
-    
-    if (command.includes('import ') || command.includes('require(') || command.includes('from ')) {
-      output += '✓ Dependencies imported\n';
-    }
-    
-    if (command.includes('console.log') || command.includes('print(')) {
-      output += 'Hello, World!\n';
-    }
-    
-    if (command.includes('function') || command.includes('def ') || command.includes('class ')) {
-      output += '✓ Function/Class defined\n';
-    }
-    
-    if (command.includes('const ') || command.includes('let ') || command.includes('var ')) {
-      output += '✓ Variables declared\n';
-    }
-    
-    output += '\nExecution completed without errors';
-    
-    return { output, success: true };
   }
 
   // Utility Methods
   getHelpText() {
     return `
-📚 COMPLETE COMMAND REFERENCE - CoderPoint Terminal
+🚀 Cloud Terminal Help
 
-✅ ENHANCED LOCAL MODE - All Commands Working
+REAL CODE EXECUTION via Cloud API!
 
-🔧 FILE SYSTEM:
-  ls, dir                    List directory contents
-  cd <path>                  Change directory  
-  mkdir <name>               Create directory
-  rmdir <name>               Remove directory
-  cp, copy <src> <dest>      Copy files
-  mv, move <src> <dest>      Move files
-  rm, del <file>             Delete files
-  cat, type <file>           Show file content
-  pwd                        Show current directory
+📝 BASIC COMMANDS:
+  help                    Show this help message
+  languages               Show supported programming languages
+  clear, cls              Clear terminal
+  pwd                     Show current directory
+  whoami                  Show current user
+  hostname                Show system hostname
+  ls, dir                 List files
+  history                 Show command history
+  cat <file>              Show file content
+  echo <text>             Print text
 
-🚀 PROGRAMMING:
-  node <file.js>             Run Node.js script
-  npm install <pkg>          Install npm package
-  npm start                  Start application
-  npx create-react-app       Create React app
-  python <file.py>           Run Python script
-  pip install <pkg>          Install Python package
+💻 CODE EXECUTION:
+  node <file.js>          Run JavaScript/Node.js code
+  node <code>             Execute inline JavaScript
+  python <file.py>        Run Python code
+  python <code>           Execute inline Python
+  java <file.java>        Run Java code
+  cpp <file.cpp>          Run C++ code
+  go <file.go>            Run Go code
+  rust <file.rs>          Run Rust code
+  php <file.php>          Run PHP code
+  ruby <file.rb>          Run Ruby code
+  ./<file>                Execute file (auto-detect language)
 
-🔧 DEVELOPMENT:
-  git clone <url>            Clone repository
-  git status                 Check git status
-  docker ps                  List containers
-  curl <url>                 Make HTTP request
+📚 EXAMPLES:
+  node hello.js           Run JavaScript file
+  python hello.py         Run Python file
+  java hello.java         Run Java file
+  node "console.log(1+2)" Execute inline JavaScript
+  python "print(3*4)"     Execute inline Python
 
-🛠️ SYSTEM:
-  ping <host>                Ping network host
-  ipconfig                   Show IP configuration
-  systeminfo                 System information
-  tasklist                   Running processes
-  whoami                     Current user
+🌐 SUPPORTED LANGUAGES:
+  JavaScript, Python, Java, C++, C, Go, Rust, PHP, Ruby, TypeScript, Bash
 
-📝 POWERSHELL:
-  Get-Help                   Show this help
-  Get-Command                List all commands
-  Get-ChildItem              List directory
-  Get-Process                Show processes
-  Get-History                Command history
-
-💡 EXAMPLES:
-  mkdir myproject            Create directory
-  cd myproject               Change to directory
-  npm init -y                Initialize project
-  node index.js              Run Node.js server
-  python app.py              Run Python app
-
-All commands work 100% locally with realistic outputs!
-    `;
-  }
-
-  getAvailableCommands() {
-    return `
-CommandType     Name
------------     ----
-Cmdlet          Get-Command
-Cmdlet          Get-Help
-Cmdlet          Get-Location
-Cmdlet          Set-Location
-Cmdlet          Get-ChildItem
-Cmdlet          Get-Date
-Cmdlet          Get-History
-Cmdlet          Clear-Host
-Application     node
-Application     npm
-Application     npx
-Application     python
-Application     pip
-Application     git
-Application     docker
-Application     curl
-Alias           ls
-Alias           dir
-Alias           cd
-Alias           mkdir
-Alias           rm
-Alias           cp
-Alias           mv
-Alias           cat
-Alias           clear
-Alias           cls
+All code is executed in real-time via Cloud API!
     `;
   }
 
@@ -1037,15 +431,10 @@ Alias           cls
       this.currentSessionId = null;
     }
   }
-
-  async testConnection() {
-    // Always return local mode
-    return { connected: false, method: 'local' };
-  }
 }
 
 // Create global terminal service instance
-const terminalService = new PowerShellTerminalService();
+const terminalService = new PistonTerminalService();
 
 export const Terminal = ({ isVisible = true }) => {
   const { colorMode } = useColorMode();
@@ -1064,14 +453,15 @@ export const Terminal = ({ isVisible = true }) => {
   useEffect(() => {
     const initializeTerminal = async () => {
       try {
-        const newSessionId = await terminalService.createSession('powershell');
+        const newSessionId = await terminalService.createSession('bash');
         setSessionId(newSessionId);
         
         const session = terminalService.getSession(newSessionId);
         setHistory([...session.history]);
 
         toast({
-          title: "Terminal Ready",
+          title: "Cloud Terminal Ready",
+          description: "Code execution via Cloud API",
           status: "success",
           duration: 3000,
           isClosable: true
@@ -1189,23 +579,23 @@ export const Terminal = ({ isVisible = true }) => {
     >
       {/* Header */}
       <HStack
-        bg="green.600"
+        bg="blue.600"
         px={4}
         py={2}
         justify="space-between"
         borderBottom="1px solid"
-        borderColor="green.700"
+        borderColor="blue.700"
       >
         <HStack spacing={3}>
-          <FaWindows />
+          <FaCode />
           <Text fontSize="sm" fontWeight="bold">
-            Windows PowerShell - 100% Local Mode
+            Cloud Terminal
           </Text>
         </HStack>
         
         <HStack spacing={2}>
-          <Badge colorScheme="green" fontSize="xs">
-            ALL COMMANDS WORKING
+          <Badge colorScheme="blue" fontSize="xs">
+            Connected
           </Badge>
           
           <Tooltip label="Clear (Ctrl+L)">
@@ -1226,7 +616,7 @@ export const Terminal = ({ isVisible = true }) => {
               variant="ghost"
               color="white"
               onClick={() => {
-                setInput('Get-History');
+                setInput('history');
                 inputRef.current?.focus();
               }}
               aria-label="Command history"
@@ -1258,7 +648,7 @@ export const Terminal = ({ isVisible = true }) => {
                 {item.type === 'input' && (
                   <HStack spacing={2} align="flex-start">
                     <Text color="green.300" fontWeight="bold" userSelect="none">
-                      {item.content.split('>')[0]}{'>'}
+                      {item.content.split('$')[0]}{'$'}
                     </Text>
                     <Text color="white">{item.rawCommand}</Text>
                   </HStack>
@@ -1278,14 +668,14 @@ export const Terminal = ({ isVisible = true }) => {
             
             {isLoading && (
               <HStack spacing={2}>
-                <Spinner size="sm" color="green.400" />
-                <Text color="gray.400">Executing command...</Text>
+                <Spinner size="sm" color="blue.400" />
+                <Text color="gray.400">Executing via Cloud API...</Text>
               </HStack>
             )}
           </VStack>
         </Box>
 
-        {/* PowerShell Input Line - INSIDE the terminal */}
+        {/* Input Line */}
         <Box
           p={3}
           borderTop="1px solid"
@@ -1295,13 +685,15 @@ export const Terminal = ({ isVisible = true }) => {
           <form onSubmit={handleSubmit}>
             <HStack spacing={2}>
               <Text color="green.300" fontWeight="bold" userSelect="none" fontSize="sm">
-                {terminalService.getSession(sessionId)?.currentDirectory || 'C:\\'}{'>'}
+                {terminalService.getSession(sessionId)?.user || 'user'}@
+                {terminalService.getSession(sessionId)?.hostname || 'terminal'}:
+                {terminalService.getSession(sessionId)?.currentDirectory || '~'}$
               </Text>
               <Input
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Enter command..."
+                placeholder="Enter command or code..."
                 variant="unstyled"
                 color="white"
                 fontSize="13px"
@@ -1317,7 +709,7 @@ export const Terminal = ({ isVisible = true }) => {
                 isLoading={isLoading}
                 isDisabled={!input.trim()}
                 aria-label="Execute command"
-                colorScheme="green"
+                colorScheme="blue"
                 variant="ghost"
               />
             </HStack>
@@ -1327,7 +719,7 @@ export const Terminal = ({ isVisible = true }) => {
             <Text><Kbd>↑↓</Kbd> History</Text>
             <Text><Kbd>Ctrl+L</Kbd> Clear</Text>
             <Text><Kbd>Enter</Kbd> Execute</Text>
-            <Text>✅ All commands work locally</Text>
+            <Text>🚀 Code execution via Cloud</Text>
           </HStack>
         </Box>
       </Box>

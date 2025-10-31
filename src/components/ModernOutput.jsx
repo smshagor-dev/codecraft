@@ -41,13 +41,15 @@ import {
   FaCompress,
   FaRocket,
   FaDesktop,
-  FaCode
+  FaCode,
+  FaChartLine
 } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 import { executeCode, executeWebCode, analyzeInputRequirements } from "../utils/compilerApis";
 import { PreviewMode } from "./PreviewMode";
 import { Terminal } from "./terminal";
 import { InputModal } from "./InputModal";
+import { GraphicalOutput } from "./GraphicalOutput";
 
 const MotionBox = motion(Box);
 
@@ -193,8 +195,22 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
 
   // Handle run code with input modal logic
   const handleRunCode = (turboMode = false) => {
-    const sourceCode = editorRef.current?.getValue();
-    if (!sourceCode) {
+    let sourceCode = '';
+    
+    // Multiple ways to get the code
+    if (editorRef.current?.getValue) {
+      sourceCode = editorRef.current.getValue();
+    } else if (editorRef.current?.editor?.getValue) {
+      sourceCode = editorRef.current.editor.getValue();
+    } else if (editorRef.current) {
+      // Try direct access
+      sourceCode = editorRef.current;
+    } else {
+      // Fallback: try to get from localStorage or props
+      sourceCode = localStorage.getItem('currentCode') || '';
+    }
+
+    if (!sourceCode || sourceCode.trim().length === 0) {
       toast({
         title: "No code to execute",
         description: "Write some code first to run it",
@@ -205,6 +221,8 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
       });
       return;
     }
+
+    console.log('Code to execute:', sourceCode.substring(0, 100) + '...');
 
     // Analyze input requirements for ALL languages
     const detectedInputFields = analyzeCodeForInput();
@@ -230,7 +248,19 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
 
   // Main execution function
   const executeCodeDirectly = async (turboMode = false, input = '') => {
-    const sourceCode = editorRef.current?.getValue();
+    let sourceCode = '';
+    
+    // Multiple ways to get the code
+    if (editorRef.current?.getValue) {
+      sourceCode = editorRef.current.getValue();
+    } else if (editorRef.current?.editor?.getValue) {
+      sourceCode = editorRef.current.editor.getValue();
+    } else if (editorRef.current) {
+      sourceCode = editorRef.current;
+    } else {
+      sourceCode = localStorage.getItem('currentCode') || '';
+    }
+
     if (!sourceCode) return;
     
     setIsLoading(true);
@@ -258,7 +288,6 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
       if (['html', 'css', 'javascript', 'js', 'jsx', 'ts', 'tsx'].includes(language)) {
         result = await executeWebCode(language, sourceCode, fileSystem);
       } else {
-        // For all other languages, pass the input to the compiler API
         result = await executeCode(language, sourceCode, input);
       }
       
@@ -456,8 +485,8 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
     switch (compilerStatus) {
       case 'connecting': return 'Connecting to Compiler';
       case 'executing': return 'Executing Code';
-      case 'success': return 'Execution Successful';
-      case 'error': return 'Execution Failed';
+      case 'success': return 'Successful';
+      case 'error': return 'Failed';
       default: return 'Ready';
     }
   };
@@ -806,6 +835,7 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
           >
             <Tab>Console ({logs.length})</Tab>
             <Tab>Output</Tab>
+            <Tab>Graphical</Tab>
             <Tab>Problems</Tab>
             <Tab>Terminal</Tab>
             <Flex flex={1} justify="flex-end" align="center">
@@ -961,6 +991,30 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
                   </VStack>
                 )}
               </VStack>
+            </TabPanel>
+
+            {/* Graphical Output Tab */}
+            <TabPanel p={4} h="100%">
+              <GraphicalOutput 
+                output={output}
+                language={language}
+                isLoading={isLoading}
+                executionData={{
+                  apiUsed: logs.find(log => log.message.includes('Executed using'))?.message.replace('✅ Executed using ', '').replace(' API', '') || 'unknown',
+                  executionTime: metrics.executionTime,
+                  success: compilerStatus === 'success',
+                  // Pass the actual execution result for better graphical detection
+                  rawOutput: output,
+                  hasGraphicalData: output && (
+                    output.includes('GRAPH_START') || 
+                    output.includes('MATPLOTLIB') ||
+                    output.includes('plt.') ||
+                    output.includes('plot(') ||
+                    output.includes('x_data') ||
+                    output.includes('y_data')
+                  )
+                }}
+              />
             </TabPanel>
 
             <TabPanel p={4}>

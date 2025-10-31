@@ -181,6 +181,283 @@ export const getFileCategory = (filename) => {
   return categories[extension] || 'file';
 };
 
+// Get default template content for different file types
+export const getDefaultTemplateContent = (filename) => {
+  const extension = getFileExtension(filename);
+  
+  const templates = {
+    // HTML
+    'html': `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CoderPoint - Welcome</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🚀 Welcome to CoderPoint</h1>
+            <p>Your online coding playground</p>
+        </header>
+        
+        <main class="main">
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3>📝 Smart Editor</h3>
+                    <p>Powerful code editor with syntax highlighting and auto-completion</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🌐 Live Preview</h3>
+                    <p>See your changes in real-time as you code</p>
+                </div>
+                <div class="feature-card">
+                    <h3>📁 File Manager</h3>
+                    <p>Organize your projects with ease</p>
+                </div>
+                <div class="feature-card">
+                    <h3>⚡ Fast Execution</h3>
+                    <p>Run your code instantly with one click</p>
+                </div>
+            </div>
+            
+            <div class="cta-section">
+                <button class="cta-button" onclick="startCoding()">Start Coding Now</button>
+                <p class="hint">Try editing this file and see the live preview!</p>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>`,
+
+    // CSS
+    'css': `/* CoderPoint - Main Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.header {
+    text-align: center;
+    color: white;
+    margin-bottom: 3rem;
+}
+
+.header h1 {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(45deg, #fff, #f0f0f0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.header p {
+    font-size: 1.2rem;
+    opacity: 0.9;
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+    margin-bottom: 3rem;
+}
+
+.feature-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    padding: 2rem;
+    border-radius: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    text-align: center;
+    color: white;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+.feature-card h3 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.feature-card p {
+    opacity: 0.9;
+    line-height: 1.5;
+}
+
+.cta-section {
+    text-align: center;
+}
+
+.cta-button {
+    background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    font-size: 1.2rem;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    margin-bottom: 1rem;
+}
+
+.cta-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(255, 107, 107, 0.4);
+}
+
+.hint {
+    color: rgba(255, 255, 255, 0.7);
+    font-style: italic;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .container {
+        padding: 1rem;
+    }
+    
+    .header h1 {
+        font-size: 2rem;
+    }
+    
+    .feature-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+}`,
+
+    // JavaScript
+    'js': `// CoderPoint - Main JavaScript File
+console.log('🚀 Welcome to CoderPoint! Start your Pratics Today!');
+
+// Initialize the application
+function init() {
+    console.log('CoderPoint initialized successfully!');
+    
+    // Add interactive features
+    setupEventListeners();
+    displayWelcomeMessage();
+}
+
+// Setup event listeners
+function setupEventListeners() {
+    // Add click listeners to all feature cards
+    const featureCards = document.querySelectorAll('.feature-card');
+    featureCards.forEach((card, index) => {
+        card.addEventListener('click', () => {
+            const features = [
+                'Smart Editor with syntax highlighting',
+                'Live Preview of your code',
+                'File Management system',
+                'Fast code execution'
+            ];
+            alert(\`Feature: \${features[index]}\`);
+        });
+    });
+}
+
+// Display welcome message
+function displayWelcomeMessage() {
+    const now = new Date();
+    const hours = now.getHours();
+    let greeting;
+    
+    if (hours < 12) {
+        greeting = 'Good morning! ☀️';
+    } else if (hours < 18) {
+        greeting = 'Good afternoon! 🌤️';
+    } else {
+        greeting = 'Good evening! 🌙';
+    }
+    
+    console.log(\`\${greeting} Ready to code?\`);
+}
+
+// Start coding function
+function startCoding() {
+    const messages = [
+        '🎉 Let\\'s build something amazing!',
+        '🚀 Launching your coding journey...',
+        '💡 Time to turn ideas into code!',
+        '👨‍💻 Welcome to the developer zone!'
+    ];
+    
+    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+    alert(randomMessage);
+    
+    // Example: Create a dynamic element
+    const dynamicElement = document.createElement('div');
+    dynamicElement.innerHTML = \`
+        <div style="
+            background: rgba(255,255,255,0.2);
+            padding: 1rem;
+            border-radius: 10px;
+            margin-top: 1rem;
+            text-align: center;
+            color: white;
+        ">
+            <strong>✨ Pro Tip:</strong> Try creating new files in the file explorer!
+        </div>
+    \`;
+    
+    const ctaSection = document.querySelector('.cta-section');
+    if (ctaSection) {
+        ctaSection.appendChild(dynamicElement);
+    }
+}
+
+// Utility functions
+function formatDate(date) {
+    return new Date(date).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+}
+
+function generateRandomColor() {
+    return '#' + Math.floor(Math.random()*16777215).toString(16);
+}
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', init);`,
+
+    // Default template for other file types
+    'default': `// Welcome to CoderPoint!
+// This is your new ${getLanguageFromExtension(filename)} file
+// Start coding here...`
+  };
+
+  return templates[extension] || templates['default'];
+};
+
 export class FileSystemNode {
   constructor(name, type = FILE_TYPES.FILE, parent = null) {
     this.id = uuidv4();
@@ -359,7 +636,7 @@ export class FileSystem {
     this.recentFiles = [];
   }
 
-  createFile(parentId, filename, content = '') {
+  createFile(parentId, filename, content = '', autoOpen = true) {
     const parent = parentId ? this.findNode(parentId) : this.root;
     if (!parent || parent.type !== FILE_TYPES.FOLDER) {
       throw new Error('Invalid parent folder');
@@ -371,10 +648,22 @@ export class FileSystem {
     }
     
     const file = new FileSystemNode(filename, FILE_TYPES.FILE);
-    file.content = content;
+    
+    // Use provided content or get default template
+    if (content === '') {
+      file.content = getDefaultTemplateContent(filename);
+    } else {
+      file.content = content;
+    }
+    
     file.language = getLanguageFromExtension(filename);
     file.category = getFileCategory(filename);
     parent.addChild(file);
+    
+    // Auto-open the file in editor
+    if (autoOpen) {
+      this.openFile(file.id);
+    }
     
     return file;
   }
@@ -612,487 +901,24 @@ export class FileSystem {
     return fs;
   }
 
-  // Create a comprehensive default project structure
+  // Create a welcome project with HTML, CSS, and JS files in src/ folder
   static createDefaultProject() {
     const fs = new FileSystem();
     
     // Create src folder
     const srcFolder = fs.createFolder(fs.root.id, 'src');
-    const componentsFolder = fs.createFolder(srcFolder.id, 'components');
-    const utilsFolder = fs.createFolder(srcFolder.id, 'utils');
     
-    // Create public folder
-    const publicFolder = fs.createFolder(fs.root.id, 'public');
+    // Create the three main files in src folder
+    const htmlFile = fs.createFile(srcFolder.id, 'index.html', '', false);
+    const cssFile = fs.createFile(srcFolder.id, 'style.css', '', false);
+    const jsFile = fs.createFile(srcFolder.id, 'script.js', '', false);
     
-    // Create config files
-    fs.createFile(fs.root.id, 'package.json', `{
-  "name": "my-project",
-  "version": "1.0.0",
-  "description": "A new project created with Online Code Editor",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
-  },
-  "devDependencies": {
-    "vite": "^4.4.0",
-    "@vitejs/plugin-react": "^4.0.0"
-  }
-}`);
-
-    fs.createFile(fs.root.id, 'vite.config.js', `import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    port: 3000,
-    open: true
-  }
-})`);
-
-    // Create main application files
-    fs.createFile(srcFolder.id, 'main.jsx', `import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.jsx'
-import './index.css'
-
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-)`);
-
-    fs.createFile(srcFolder.id, 'App.jsx', `import { useState } from 'react'
-import Header from './components/Header.jsx'
-import './App.css'
-
-function App() {
-  const [count, setCount] = useState(0)
-
-  return (
-    <div className="app">
-      <Header />
-      <main className="main-content">
-        <h1>Welcome to Your New Project!</h1>
-        <div className="card">
-          <button onClick={() => setCount((count) => count + 1)}>
-            Count is {count}
-          </button>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test HMR
-          </p>
-        </div>
-      </main>
-    </div>
-  )
-}
-
-export default App`);
-
-    fs.createFile(srcFolder.id, 'index.css', `:root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
-}
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-#root {
-  width: 100%;
-  margin: 0 auto;
-  text-align: center;
-}`);
-
-    fs.createFile(srcFolder.id, 'App.css', `.app {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.main-content {
-  flex: 1;
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.card {
-  padding: 2em;
-  margin: 1em 0;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  color: white;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-
-button:hover {
-  border-color: #646cff;
-}
-
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  button {
-    background-color: #f9f9f9;
-    color: #213547;
-  }
-}`);
-
-    // Create components
-    fs.createFile(componentsFolder.id, 'Header.jsx', `import './Header.css'
-
-function Header() {
-  return (
-    <header className="header">
-      <nav className="nav">
-        <h1>My Awesome Project</h1>
-        <ul className="nav-links">
-          <li><a href="#home">Home</a></li>
-          <li><a href="#about">About</a></li>
-          <li><a href="#contact">Contact</a></li>
-        </ul>
-      </nav>
-    </header>
-  )
-}
-
-export default Header`);
-
-    fs.createFile(componentsFolder.id, 'Header.css', `.header {
-  background-color: #1a1a1a;
-  padding: 1rem 2rem;
-  border-bottom: 1px solid #333;
-}
-
-.nav {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.nav h1 {
-  color: #646cff;
-  font-size: 1.5rem;
-}
-
-.nav-links {
-  display: flex;
-  list-style: none;
-  gap: 2rem;
-}
-
-.nav-links a {
-  color: inherit;
-  text-decoration: none;
-  transition: color 0.3s;
-}
-
-.nav-links a:hover {
-  color: #646cff;
-}`);
-
-    // Create utility files
-    fs.createFile(utilsFolder.id, 'helpers.js', `// Utility functions
-export function formatDate(date) {
-  return new Date(date).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
-}
-
-export function debounce(func, wait) {
-  let timeout
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout)
-      func(...args)
-    }
-    clearTimeout(timeout)
-    timeout = setTimeout(later, wait)
-  }
-}
-
-export function generateId() {
-  return Math.random().toString(36).substr(2, 9)
-}`);
-
-    fs.createFile(utilsFolder.id, 'constants.js', `// Application constants
-export const APP_CONFIG = {
-  name: 'My Project',
-  version: '1.0.0',
-  author: 'Developer',
-  repository: 'https://github.com/username/my-project'
-}
-
-export const API_ENDPOINTS = {
-  BASE_URL: 'https://api.example.com',
-  USERS: '/users',
-  POSTS: '/posts',
-  COMMENTS: '/comments'
-}
-
-export const THEME = {
-  colors: {
-    primary: '#646cff',
-    secondary: '#535bf2',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    error: '#ef4444'
-  },
-  breakpoints: {
-    mobile: '768px',
-    tablet: '1024px',
-    desktop: '1200px'
-  }
-}`);
-
-    // Create public files
-    fs.createFile(publicFolder.id, 'index.html', `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Project - Online Code Editor</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
-</html>`);
-
-    fs.createFile(publicFolder.id, 'vite.svg', `<svg width="31" height="32" viewBox="0 0 31 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M30.155 2.899L23.43 29.35a1.347 1.347 0 01-2.322.663l-5.238-5.68-3.166 4.06a.732.732 0 01-1.212-.073l-2.74-4.944-6.563-3.998a1.347 1.347 0 01.396-2.467l26.916-7.594a.675.675 0 01.854.8z" fill="url(#paint0_linear_83_60)"/>
-<path d="M21.387 25.688l-4.115-10.986 10.358 2.921-6.243 8.065z" fill="url(#paint1_linear_83_60)"/>
-<defs>
-<linearGradient id="paint0_linear_83_60" x1="25.993" y1="4.067" x2="8.797" y2="29.447" gradientUnits="userSpaceOnUse">
-<stop stop-color="#41D1FF"/>
-<stop offset="1" stop-color="#BD34FE"/>
-</linearGradient>
-<linearGradient id="paint1_linear_83_60" x1="23.262" y1="16.297" x2="20.306" y2="24.846" gradientUnits="userSpaceOnUse">
-<stop stop-color="#FFEA83"/>
-<stop offset="0.083" stop-color="#FFDD35"/>
-<stop offset="1" stop-color="#FFA800"/>
-</linearGradient>
-</defs>
-</svg>`);
-
-    // Create documentation
-    fs.createFile(fs.root.id, 'README.md', `# My Project
-
-Welcome to your new project created with the Online Code Editor!
-
-## 🚀 Features
-
-- **Modern Stack**: React 18 + Vite for fast development
-- **Hot Reload**: Instant preview of your changes
-- **TypeScript Ready**: Configured for TypeScript development
-- **Responsive Design**: Mobile-first CSS approach
-
-## 📁 Project Structure
-
-\`\`\`
-my-project/
-├── public/
-│   ├── index.html
-│   └── vite.svg
-├── src/
-│   ├── components/
-│   │   ├── Header.jsx
-│   │   └── Header.css
-│   ├── utils/
-│   │   ├── helpers.js
-│   │   └── constants.js
-│   ├── App.jsx
-│   ├── App.css
-│   ├── main.jsx
-│   └── index.css
-├── package.json
-├── vite.config.js
-└── README.md
-\`\`\`
-
-## 🛠️ Getting Started
-
-1. **Edit files** in the file explorer
-2. **Run your code** with Cmd/Ctrl + Enter
-3. **View output** in the developer console
-4. **Customize** the components and styles
-
-## 📚 Available Scripts
-
-- \`npm run dev\` - Start development server
-- \`npm run build\` - Build for production
-- \`npm run preview\` - Preview production build
-
-## 🎯 Next Steps
-
-1. Explore the component structure
-2. Modify the App.jsx to build your UI
-3. Add new components in the components folder
-4. Customize styles in CSS files
-5. Install additional dependencies as needed
-
-Happy coding! 🎉`);
-
-    // Create additional configuration files
-    fs.createFile(fs.root.id, '.gitignore', `# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Directory for instrumented libs generated by jscoverage/JSCover
-lib-cov
-
-# Coverage directory used by tools like istanbul
-coverage
-*.lcov
-
-# nyc test coverage
-.nyc_output
-
-# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
-.grunt
-
-# Bower dependency directory (https://bower.io/)
-bower_components
-
-# node-waf configuration
-.lock-wscript
-
-# Compiled binary addons (https://nodejs.org/api/addons.html)
-build/Release
-
-# Dependency directories
-node_modules/
-jspm_packages/
-
-# TypeScript cache
-*.tsbuildinfo
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# dotenv environment variables file
-.env
-.env.test
-
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
-
-# Next.js build output
-.next
-
-# Nuxt.js build / generate output
-.nuxt
-dist
-
-# Gatsby files
-.cache/
-# Comment in the public line in if your project uses Gatsby and *not* Next.js
-# https://nextjs.org/blog/next-9-1#public-directory-support
-# public
-
-# vuepress build output
-.vuepress/dist
-
-# Serverless directories
-.serverless/
-
-# FuseBox cache
-.fusebox/
-
-# DynamoDB Local files
-.dynamodb/
-
-# TernJS port file
-.tern-port
-
-# Stores VSCode versions used for testing VSCode extensions
-.vscode-test`);
-
-    // Open the main App file by default
-    const appFile = srcFolder.children.find(child => child.name === 'App.jsx');
-    if (appFile) {
-      fs.openFile(appFile.id);
-    }
-
+    // Open the HTML file by default
+    fs.openFile(htmlFile.id);
+    
+    // Make src folder open by default
+    srcFolder.isOpen = true;
+    
     return fs;
   }
 }

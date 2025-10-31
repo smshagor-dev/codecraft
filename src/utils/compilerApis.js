@@ -1,20 +1,4 @@
 export const COMPILER_APIS = {
-  coderpoint: {
-    name: 'CoderPoint API',
-    api: `${import.meta.env.VITE_API_URL}/execute`,
-    method: 'POST',
-    free: true,
-    rateLimit: 'Unlimited',
-    languages: ['python', 'javascript', 'java', 'cpp', 'c', 'rust', 'go', 'csharp', 'php', 'ruby', 'swift', 'kotlin', 'typescript']
-  },
-  piston: {
-    name: 'Piston API',
-    api: 'https://emkc.org/api/v2/piston/execute',
-    method: 'POST',
-    free: true,
-    rateLimit: 'Unlimited',
-    languages: ['python', 'javascript', 'java', 'cpp', 'c', 'rust', 'go', 'csharp', 'php', 'ruby', 'swift', 'kotlin']
-  },
   codex: {
     name: 'Codex API',
     api: 'https://api.codex.jaagrav.in',
@@ -31,6 +15,30 @@ export const COMPILER_APIS = {
     free: true,
     rateLimit: 'Unlimited',
     languages: ['python', 'javascript', 'java', 'cpp', 'c', 'php', 'ruby', 'go', 'rust', 'swift']
+  },
+  jdoodle: {
+    name: 'JDoodle API',
+    api: 'https://api.jdoodle.com/v1/execute',
+    method: 'POST',
+    free: true,
+    rateLimit: '200 requests per day',
+    languages: ['python', 'javascript', 'java', 'cpp', 'c', 'csharp', 'php', 'ruby', 'go', 'rust', 'swift', 'kotlin']
+  },
+  piston: {
+    name: 'Piston API',
+    api: 'https://emkc.org/api/v2/piston/execute',
+    method: 'POST',
+    free: true,
+    rateLimit: 'Unlimited',
+    languages: ['python', 'javascript', 'java', 'cpp', 'c', 'rust', 'go', 'csharp', 'php', 'ruby', 'swift', 'kotlin']
+  },
+  codeexecutor: {
+    name: 'CodeExecutor API',
+    api: 'https://api.codeexecutor.com/execute',
+    method: 'POST',
+    free: true,
+    rateLimit: 'Unlimited',
+    languages: ['python', 'javascript', 'java', 'cpp', 'c', 'rust', 'go', 'csharp', 'php', 'ruby', 'swift', 'kotlin', 'typescript']
   }
 };
 
@@ -84,23 +92,6 @@ export const LANGUAGE_MAPPING = {
   'kotlin': 'kotlin'
 };
 
-// Language mapping for CoderPoint API
-export const CODERPOINT_LANGUAGE_MAPPING = {
-  'python': 'python',
-  'javascript': 'nodejs',
-  'typescript': 'typescript',
-  'java': 'java',
-  'cpp': 'cpp',
-  'c': 'c',
-  'csharp': 'csharp',
-  'php': 'php',
-  'ruby': 'ruby',
-  'go': 'go',
-  'rust': 'rust',
-  'swift': 'swift',
-  'kotlin': 'kotlin'
-};
-
 // Main execution function
 export const executeCode = async (language, code, input = '') => {
   const langKey = language.toLowerCase();
@@ -110,8 +101,31 @@ export const executeCode = async (language, code, input = '') => {
     throw new Error(`Language "${language}" is not supported`);
   }
 
-  // Try APIs in order - CoderPoint first, then fallbacks
-  const apisToTry = ['coderpoint', 'piston', 'codex', 'paiza'];
+  // Create API list based on language and libraries
+  let apisToTry;
+  
+  // Check for data science libraries in Python
+  if (language === 'python') {
+    const hasDataScienceLibs = 
+      code.includes('import pandas') || 
+      code.includes('import matplotlib') || 
+      code.includes('import numpy') || 
+      code.includes('import scipy') ||
+      code.includes('import seaborn') ||
+      code.includes('from matplotlib') ||
+      code.includes('from scipy') ||
+      code.includes('from sklearn');
+    
+    if (hasDataScienceLibs) {
+      console.log('Data science libraries detected, prioritizing Paiza API');
+      apisToTry = ['paiza', 'codex', 'jdoodle', 'piston', 'codeexecutor'];
+    } else {
+      apisToTry = ['codex', 'paiza', 'jdoodle', 'piston', 'codeexecutor'];
+    }
+  } else {
+    apisToTry = ['codex', 'paiza', 'jdoodle', 'piston', 'codeexecutor'];
+  }
+
   const errors = [];
 
   for (const apiName of apisToTry) {
@@ -137,35 +151,32 @@ export const executeCode = async (language, code, input = '') => {
 // Execute with specific API
 const executeWithAPI = async (apiName, language, code, input = '') => {
   switch (apiName) {
-    case 'coderpoint':
-      return await executeWithCoderPointAPI(language, code, input);
-    case 'piston':
-      return await executeWithPistonAPI(language, code, input);
     case 'codex':
       return await executeWithCodexAPI(language, code, input);
     case 'paiza':
       return await executeWithPaizaAPI(language, code, input);
+    case 'jdoodle':
+      return await executeWithJDoodleAPI(language, code, input);
+    case 'piston':
+      return await executeWithPistonAPI(language, code, input);
+    case 'codeexecutor':
+      return await executeWithCodeExecutorAPI(language, code, input);
     default:
       throw new Error(`API ${apiName} not implemented`);
   }
 };
 
-// CoderPoint API Implementation
-const executeWithCoderPointAPI = async (language, code, input = '') => {
+// Codex API Implementation
+const executeWithCodexAPI = async (language, code, input = '') => {
   try {
-    const coderpointLang = CODERPOINT_LANGUAGE_MAPPING[language];
-    if (!coderpointLang) {
-      throw new Error(`CoderPoint doesn't support ${language}`);
-    }
-
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/execute`, {
+    const response = await fetch('https://api.codex.jaagrav.in', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        language: coderpointLang,
         code: code,
+        language: language,
         input: input
       })
     });
@@ -176,41 +187,171 @@ const executeWithCoderPointAPI = async (language, code, input = '') => {
 
     const result = await response.json();
     
-    console.log('CoderPoint API raw response:', result);
-    
-    // Handle different response formats from CoderPoint API
-    if (result.output !== undefined || result.error !== undefined) {
-      return {
-        run: {
-          output: result.output || '',
-          stderr: result.error || '',
-          stdout: result.output || '',
-          code: result.exitCode || 0
-        }
-      };
-    } else if (result.run) {
-      return {
-        run: {
-          output: result.run.output || '',
-          stderr: result.run.stderr || '',
-          stdout: result.run.stdout || '',
-          code: result.run.code || 0
-        }
-      };
-    } else if (result.result) {
-      return {
-        run: {
-          output: result.result.output || '',
-          stderr: result.result.error || '',
-          stdout: result.result.output || '',
-          code: result.result.exitCode || 0
-        }
-      };
-    } else {
-      throw new Error('Unexpected response format from CoderPoint API');
+    if (result.error) {
+      throw new Error(result.error);
     }
+
+    return {
+      run: {
+        output: result.output || '',
+        stderr: result.error || '',
+        stdout: result.output || ''
+      }
+    };
   } catch (error) {
-    throw new Error(`CoderPoint API: ${error.message}`);
+    throw new Error(`Codex API: ${error.message}`);
+  }
+};
+
+// Paiza.IO API Implementation - FIXED
+const executeWithPaizaAPI = async (language, code, input = '') => {
+  const paizaLanguageMap = {
+    'python': 'python3',
+    'javascript': 'javascript',
+    'java': 'java',
+    'cpp': 'cpp',
+    'c': 'c',
+    'php': 'php',
+    'ruby': 'ruby',
+    'go': 'go',
+    'rust': 'rust',
+    'swift': 'swift'
+  };
+
+  const paizaLang = paizaLanguageMap[language];
+  if (!paizaLang) {
+    throw new Error(`Paiza doesn't support ${language}`);
+  }
+
+  try {
+    // Create runner - use hardcoded 'guest' instead of process.env
+    const createResponse = await fetch('https://api.paiza.io/runners/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        source_code: code,
+        language: paizaLang,
+        input: input,
+        api_key: 'guest' // Hardcoded for browser compatibility
+      })
+    });
+
+    const createResult = await createResponse.json();
+    
+    if (createResult.error) {
+      throw new Error(createResult.error);
+    }
+
+    if (!createResult.id) {
+      throw new Error('Failed to create runner session');
+    }
+
+    // Poll for results with timeout
+    const timeout = 20000; // 20 seconds
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < timeout) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const statusResponse = await fetch(`https://api.paiza.io/runners/get_status?id=${createResult.id}&api_key=guest`);
+      const statusResult = await statusResponse.json();
+      
+      if (statusResult.error) {
+        throw new Error(statusResult.error);
+      }
+      
+      if (statusResult.status === 'completed') {
+        const detailsResponse = await fetch(`https://api.paiza.io/runners/get_details?id=${createResult.id}&api_key=guest`);
+        const details = await detailsResponse.json();
+        
+        if (details.error) {
+          throw new Error(details.error);
+        }
+        
+        return {
+          run: {
+            output: details.stdout || '',
+            stderr: details.stderr || details.build_stderr || '',
+            stdout: details.stdout || '',
+            exit_code: details.exit_code || 0
+          }
+        };
+      } else if (statusResult.status === 'error') {
+        throw new Error('Execution error in Paiza API');
+      }
+    }
+
+    throw new Error('Execution timeout');
+  } catch (error) {
+    throw new Error(`Paiza API: ${error.message}`);
+  }
+};
+
+// JDoodle API Implementation - FIXED
+const executeWithJDoodleAPI = async (language, code, input = '') => {
+  const jdoodleLanguageMap = {
+    'python': 'python3',
+    'javascript': 'nodejs',
+    'java': 'java',
+    'cpp': 'cpp',
+    'c': 'c',
+    'csharp': 'csharp',
+    'php': 'php',
+    'ruby': 'ruby',
+    'go': 'go',
+    'rust': 'rust',
+    'swift': 'swift',
+    'kotlin': 'kotlin'
+  };
+
+  const jdoodleLang = jdoodleLanguageMap[language];
+  if (!jdoodleLang) {
+    throw new Error(`JDoodle doesn't support ${language}`);
+  }
+
+  try {
+    // Use hardcoded credentials for browser compatibility
+    const clientId = '9143123cdb6e8b72a552c3449ca7f7e7';
+    const clientSecret = 'e90b70abfc6ac26d36ad6e9c3b84ab334decc8b23b8443b270b171828801e3d3';
+    
+    const response = await fetch('https://api.jdoodle.com/v1/execute', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        clientId: clientId,
+        clientSecret: clientSecret,
+        script: code,
+        language: jdoodleLang,
+        versionIndex: '0',
+        stdin: input
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
+    return {
+      run: {
+        output: result.output || '',
+        stderr: result.error || '',
+        stdout: result.output || '',
+        memory: result.memory,
+        cpuTime: result.cpuTime
+      }
+    };
+  } catch (error) {
+    throw new Error(`JDoodle API: ${error.message}`);
   }
 };
 
@@ -257,17 +398,17 @@ const executeWithPistonAPI = async (language, code, input = '') => {
   }
 };
 
-// Codex API Implementation
-const executeWithCodexAPI = async (language, code, input = '') => {
+// CodeExecutor API Implementation
+const executeWithCodeExecutorAPI = async (language, code, input = '') => {
   try {
-    const response = await fetch('https://api.codex.jaagrav.in', {
+    const response = await fetch('https://api.codeexecutor.com/execute', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        code: code,
         language: language,
+        code: code,
         input: input
       })
     });
@@ -278,98 +419,40 @@ const executeWithCodexAPI = async (language, code, input = '') => {
 
     const result = await response.json();
     
-    if (result.error) {
-      throw new Error(result.error);
-    }
-
-    return {
-      run: {
-        output: result.output || '',
-        stderr: result.error || '',
-        stdout: result.output || ''
-      }
-    };
-  } catch (error) {
-    throw new Error(`Codex API: ${error.message}`);
-  }
-};
-
-// Paiza.IO API Implementation
-const executeWithPaizaAPI = async (language, code, input = '') => {
-  const paizaLanguageMap = {
-    'python': 'python3',
-    'javascript': 'javascript',
-    'java': 'java',
-    'cpp': 'cpp',
-    'c': 'c',
-    'php': 'php',
-    'ruby': 'ruby',
-    'go': 'go',
-    'rust': 'rust',
-    'swift': 'swift'
-  };
-
-  const paizaLang = paizaLanguageMap[language];
-  if (!paizaLang) {
-    throw new Error(`Paiza doesn't support ${language}`);
-  }
-
-  try {
-    // Create runner
-    const createResponse = await fetch('https://api.paiza.io/runners/create', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        source_code: code,
-        language: paizaLang,
-        input: input,
-        api_key: 'guest'
-      })
-    });
-
-    const createResult = await createResponse.json();
+    console.log('CodeExecutor API raw response:', result);
     
-    if (createResult.error) {
-      throw new Error(createResult.error);
+    if (result.output !== undefined || result.error !== undefined) {
+      return {
+        run: {
+          output: result.output || '',
+          stderr: result.error || '',
+          stdout: result.output || '',
+          code: result.exitCode || 0
+        }
+      };
+    } else if (result.run) {
+      return {
+        run: {
+          output: result.run.output || '',
+          stderr: result.run.stderr || '',
+          stdout: result.run.stdout || '',
+          code: result.run.code || 0
+        }
+      };
+    } else if (result.result) {
+      return {
+        run: {
+          output: result.result.output || '',
+          stderr: result.result.error || '',
+          stdout: result.result.output || '',
+          code: result.result.exitCode || 0
+        }
+      };
+    } else {
+      throw new Error('Unexpected response format from CodeExecutor API');
     }
-
-    if (!createResult.id) {
-      throw new Error('Failed to create runner session');
-    }
-
-    // Poll for results with timeout
-    const timeout = 20000; // 20 seconds
-    const startTime = Date.now();
-    
-    while (Date.now() - startTime < timeout) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const statusResponse = await fetch(`https://api.paiza.io/runners/get_status?id=${createResult.id}&api_key=guest`);
-      const statusResult = await statusResponse.json();
-      
-      if (statusResult.error) {
-        throw new Error(statusResult.error);
-      }
-      
-      if (statusResult.status === 'completed') {
-        const detailsResponse = await fetch(`https://api.paiza.io/runners/get_details?id=${createResult.id}&api_key=guest`);
-        const details = await detailsResponse.json();
-        
-        return {
-          run: {
-            output: details.stdout || '',
-            stderr: details.stderr || details.build_stderr || '',
-            stdout: details.stdout || ''
-          }
-        };
-      }
-    }
-
-    throw new Error('Execution timeout');
   } catch (error) {
-    throw new Error(`Paiza API: ${error.message}`);
+    throw new Error(`CodeExecutor API: ${error.message}`);
   }
 };
 
@@ -811,31 +894,65 @@ export const getSupportedLanguages = () => {
 // Get API status
 export const getAPIStatus = async () => {
   const status = {
-    coderpoint: { status: 'unknown', responseTime: 0 },
-    piston: { status: 'unknown', responseTime: 0 },
     codex: { status: 'unknown', responseTime: 0 },
-    paiza: { status: 'unknown', responseTime: 0 }
+    paiza: { status: 'unknown', responseTime: 0 },
+    jdoodle: { status: 'unknown', responseTime: 0 },
+    piston: { status: 'unknown', responseTime: 0 },
+    codeexecutor: { status: 'unknown', responseTime: 0 }
   };
 
-  // Test CoderPoint API
+  // Test Codex API
   try {
     const startTime = performance.now();
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/status`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      }
+    const response = await fetch('https://api.codex.jaagrav.in', {
+      method: 'HEAD'
     });
     const endTime = performance.now();
     
     if (response.ok) {
-      status.coderpoint.status = 'online';
-      status.coderpoint.responseTime = Math.round(endTime - startTime);
+      status.codex.status = 'online';
+      status.codex.responseTime = Math.round(endTime - startTime);
     } else {
-      status.coderpoint.status = 'offline';
+      status.codex.status = 'offline';
     }
   } catch (error) {
-    status.coderpoint.status = 'offline';
+    status.codex.status = 'offline';
+  }
+
+  // Test Paiza API
+  try {
+    const startTime = performance.now();
+    const response = await fetch('https://api.paiza.io/runners/create', {
+      method: 'HEAD'
+    });
+    const endTime = performance.now();
+    
+    if (response.ok) {
+      status.paiza.status = 'online';
+      status.paiza.responseTime = Math.round(endTime - startTime);
+    } else {
+      status.paiza.status = 'offline';
+    }
+  } catch (error) {
+    status.paiza.status = 'offline';
+  }
+
+  // Test JDoodle API
+  try {
+    const startTime = performance.now();
+    const response = await fetch('https://api.jdoodle.com/v1/execute', {
+      method: 'HEAD'
+    });
+    const endTime = performance.now();
+    
+    if (response.ok) {
+      status.jdoodle.status = 'online';
+      status.jdoodle.responseTime = Math.round(endTime - startTime);
+    } else {
+      status.jdoodle.status = 'offline';
+    }
+  } catch (error) {
+    status.jdoodle.status = 'offline';
   }
 
   // Test Piston API
@@ -854,6 +971,24 @@ export const getAPIStatus = async () => {
     }
   } catch (error) {
     status.piston.status = 'offline';
+  }
+
+  // Test CodeExecutor API
+  try {
+    const startTime = performance.now();
+    const response = await fetch('https://api.codeexecutor.com', {
+      method: 'HEAD'
+    });
+    const endTime = performance.now();
+    
+    if (response.ok) {
+      status.codeexecutor.status = 'online';
+      status.codeexecutor.responseTime = Math.round(endTime - startTime);
+    } else {
+      status.codeexecutor.status = 'offline';
+    }
+  } catch (error) {
+    status.codeexecutor.status = 'offline';
   }
 
   return status;

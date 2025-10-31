@@ -11,7 +11,8 @@ import {
   Tab,
   TabPanels,
   TabPanel,
-  IconButton
+  IconButton,
+  Badge
 } from '@chakra-ui/react';
 import { CloseIcon } from '@chakra-ui/icons';
 import { Editor } from '@monaco-editor/react';
@@ -31,6 +32,7 @@ export const ProjectEditor = () => {
     } catch (error) {
       console.error('Failed to load file system:', error);
     }
+    // Always return welcome project for first-time users
     return FileSystem.createDefaultProject();
   });
   
@@ -137,12 +139,11 @@ export const ProjectEditor = () => {
               }
             } else {
               // Create file
-              const newFile = fileSystem.createFile(parentId, item.name, item.content || '');
+              const newFile = fileSystem.createFile(parentId, item.name, item.content || '', true);
               if (newFile && !firstFileId) {
                 // Set the first file to open (skip README.md)
                 if (!item.name.toLowerCase().includes('readme')) {
                   firstFileId = newFile.id;
-                  fileSystem.openFile(newFile.id);
                 }
               }
             }
@@ -220,12 +221,14 @@ export const ProjectEditor = () => {
     }
   };
 
-
   const handleEditorMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
     editor.focus();
 
+    // Customize editor with CoderPoint branding
+    monaco.editor.setTheme('coderpoint-theme');
+    
     // Add keyboard shortcuts
     editor.addAction({
       id: "run-code",
@@ -244,11 +247,22 @@ export const ProjectEditor = () => {
       run: () => {
         toast({
           title: "Auto-save enabled",
-          description: "Your files are automatically saved",
+          description: "Your files are automatically saved in CoderPoint",
           status: "info",
           duration: 2000,
           isClosable: true
         });
+      }
+    });
+
+    // Add CoderPoint custom theme
+    monaco.editor.defineTheme('coderpoint-theme', {
+      base: colorMode === 'dark' ? 'vs-dark' : 'vs',
+      inherit: true,
+      rules: [],
+      colors: {
+        'editor.background': colorMode === 'dark' ? '#1a1f36' : '#ffffff',
+        'editor.foreground': colorMode === 'dark' ? '#e2e8f0' : '#2d3748',
       }
     });
   };
@@ -299,7 +313,32 @@ export const ProjectEditor = () => {
       </Box>
 
       {/* Code Editor */}
-      <Box flex={1} h="100%">
+      <Box flex={1} h="100%" display="flex" flexDirection="column">
+        {/* CoderPoint Editor Header */}
+        <Box 
+          px={4} 
+          py={2} 
+          borderBottom="1px solid" 
+          borderColor={colorMode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}
+          bg={colorMode === 'dark' ? 'rgba(26, 31, 54, 0.8)' : 'rgba(255, 255, 255, 0.9)'}
+        >
+          <HStack justify="space-between">
+            <HStack spacing={3}>
+              <Badge colorScheme="purple" variant="solid">
+                CoderPoint Editor
+              </Badge>
+              <Text fontSize="sm" color={colorMode === 'dark' ? 'gray.300' : 'gray.600'}>
+                {activeFile ? `Editing: ${activeFile.name}` : 'No file open'}
+              </Text>
+            </HStack>
+            {activeFile && (
+              <Badge colorScheme="blue" variant="subtle">
+                {activeFile.language?.toUpperCase() || 'TEXT'}
+              </Badge>
+            )}
+          </HStack>
+        </Box>
+
         {openFiles.length > 0 ? (
           <Tabs
             index={openFiles.findIndex(f => f.id === activeFileId)}
@@ -307,6 +346,7 @@ export const ProjectEditor = () => {
             h="100%"
             display="flex"
             flexDirection="column"
+            flex={1}
           >
             <TabList>
               {openFiles.map(file => (
@@ -331,8 +371,8 @@ export const ProjectEditor = () => {
               {openFiles.map(file => (
                 <TabPanel key={file.id} p={0} h="100%">
                   <Editor
-                    language={file.language || 'javascript'}
-                    theme={`vs-${colorMode}`}
+                    language={file.language || 'html'}
+                    theme={colorMode === 'dark' ? 'coderpoint-theme' : 'vs'}
                     value={file.content || ''}
                     onChange={(value) => handleFileContentChange(file.id, value)}
                     onMount={handleEditorMount}
@@ -349,14 +389,18 @@ export const ProjectEditor = () => {
             alignItems="center"
             justifyContent="center"
             bg={colorMode === 'dark' ? 'gray.800' : 'gray.50'}
+            flex={1}
           >
             <VStack spacing={4}>
               <Text fontSize="lg" color="gray.500">
-                No files open
+                CoderPoint Editor
               </Text>
               <Text fontSize="sm" color="gray.400">
                 Select a file from the explorer or create a new one
               </Text>
+              <Badge colorScheme="purple">
+                Powered by CoderPoint
+              </Badge>
             </VStack>
           </Box>
         )}
@@ -366,7 +410,7 @@ export const ProjectEditor = () => {
       <Box w="40%" h="100%" overflow="hidden">
         <ModernOutput 
           editorRef={editorRef} 
-          language={activeFile?.language || 'javascript'}
+          language={activeFile?.language || 'html'}
           fileSystem={fileSystem}
           onFileSelect={handleFileSelect}
           onFileSystemChange={handleFileSystemChange}
@@ -376,9 +420,9 @@ export const ProjectEditor = () => {
       {/* Save indicator */}
       {isSaving && (
         <Box position="fixed" bottom={4} right={4}>
-          <Text fontSize="xs" color="gray.500">
-            Saving...
-          </Text>
+          <Badge colorScheme="green" variant="subtle">
+            CoderPoint: Saving...
+          </Badge>
         </Box>
       )}
     </HStack>
