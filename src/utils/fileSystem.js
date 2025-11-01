@@ -449,6 +449,541 @@ function generateRandomColor() {
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', init);`,
 
+    // Python
+    'py': `# CoderPoint - Python File
+# Welcome to CoderPoint! Start your Pratics Today!
+
+print("🚀 Welcome to CoderPoint!")
+
+def init():
+    """
+    Initialize the application
+    """
+    print("CoderPoint initialized successfully!")
+    
+    # Add interactive features
+    display_welcome_message()
+    demonstrate_features()
+
+def display_welcome_message():
+    """
+    Display a personalized welcome message
+    """
+    from datetime import datetime
+    
+    now = datetime.now()
+    hour = now.hour
+    
+    if hour < 12:
+        greeting = "Good morning! ☀️"
+    elif hour < 18:
+        greeting = "Good afternoon! 🌤️"
+    else:
+        greeting = "Good evening! 🌙"
+    
+    print(f"{greeting} Ready to code?")
+
+def demonstrate_features():
+    """
+    Demonstrate some Python features
+    """
+    # List of features
+    features = [
+        "Smart Editor with syntax highlighting",
+        "Live Preview of your code",
+        "File Management system",
+        "Fast code execution"
+    ]
+    
+    print("\\n✨ Available Features:")
+    for i, feature in enumerate(features, 1):
+        print(f"  {i}. {feature}")
+    
+    # Example data processing
+    numbers = [1, 2, 3, 4, 5]
+    squares = [x**2 for x in numbers]
+    print(f"\\n📊 Example: Squares of {numbers} are {squares}")
+
+def start_coding():
+    """
+    Start the coding session with motivation!
+    """
+    import random
+    
+    messages = [
+        "🎉 Let's build something amazing!",
+        "🚀 Launching your coding journey...",
+        "💡 Time to turn ideas into code!",
+        "👨‍💻 Welcome to the developer zone!"
+    ]
+    
+    random_message = random.choice(messages)
+    print(f"\\n{random_message}")
+    
+    return random_message
+
+# Utility functions
+def calculate_fibonacci(n):
+    """
+    Calculate Fibonacci sequence up to n numbers
+    """
+    sequence = [0, 1]
+    for i in range(2, n):
+        sequence.append(sequence[i-1] + sequence[i-2])
+    return sequence[:n]
+
+def format_file_size(bytes):
+    """
+    Format file size in human-readable format
+    """
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if bytes < 1024.0:
+            return f"{bytes:.2f} {unit}"
+        bytes /= 1024.0
+    return f"{bytes:.2f} TB"
+
+# Main execution
+if __name__ == "__main__":
+    init()
+    start_coding()
+    
+    # Demonstrate fibonacci
+    fib_sequence = calculate_fibonacci(10)
+    print(f"\\n🔢 Fibonacci sequence: {fib_sequence}")`,
+
+    // Java
+    'java': `/*
+ * CoderPoint - Java File
+ * Welcome to CoderPoint! Start your Pratics Today!
+ */
+
+public class Main {
+    public static void main(String[] args) {
+        System.out.println("🚀 Welcome to CoderPoint!");
+        
+        // Initialize the application
+        init();
+        displayWelcomeMessage();
+        startCoding();
+    }
+    
+    /**
+     * Initialize the application
+     */
+    public static void init() {
+        System.out.println("CoderPoint initialized successfully!");
+        demonstrateFeatures();
+    }
+    
+    /**
+     * Display a personalized welcome message
+     */
+    public static void displayWelcomeMessage() {
+        java.time.LocalTime now = java.time.LocalTime.now();
+        int hour = now.getHour();
+        String greeting;
+        
+        if (hour < 12) {
+            greeting = "Good morning! ☀️";
+        } else if (hour < 18) {
+            greeting = "Good afternoon! 🌤️";
+        } else {
+            greeting = "Good evening! 🌙";
+        }
+        
+        System.out.println(greeting + " Ready to code?");
+    }
+    
+    /**
+     * Demonstrate Java features
+     */
+    public static void demonstrateFeatures() {
+        String[] features = {
+            "Smart Editor with syntax highlighting",
+            "Live Preview of your code", 
+            "File Management system",
+            "Fast code execution"
+        };
+        
+        System.out.println("\\n✨ Available Features:");
+        for (int i = 0; i < features.length; i++) {
+            System.out.println("  " + (i + 1) + ". " + features[i]);
+        }
+        
+        // Example: Calculate squares
+        int[] numbers = {1, 2, 3, 4, 5};
+        System.out.print("\\n📊 Squares: ");
+        for (int num : numbers) {
+            System.out.print(num * num + " ");
+        }
+        System.out.println();
+    }
+    
+    /**
+     * Start the coding session
+     */
+    public static void startCoding() {
+        String[] messages = {
+            "🎉 Let's build something amazing!",
+            "🚀 Launching your coding journey...",
+            "💡 Time to turn ideas into code!",
+            "👨‍💻 Welcome to the developer zone!"
+        };
+        
+        String randomMessage = messages[(int)(Math.random() * messages.length)];
+        System.out.println("\\n" + randomMessage);
+    }
+    
+    /**
+     * Utility method to calculate factorial
+     */
+    public static int factorial(int n) {
+        if (n == 0) return 1;
+        return n * factorial(n - 1);
+    }
+    
+    /**
+     * Utility method to check if number is prime
+     */
+    public static boolean isPrime(int num) {
+        if (num <= 1) return false;
+        for (int i = 2; i <= Math.sqrt(num); i++) {
+            if (num % i == 0) return false;
+        }
+        return true;
+    }
+}`,
+
+    // C++
+    'cpp': `/*
+ * CoderPoint - C++ File
+ * Welcome to CoderPoint! Start your Pratics Today!
+ */
+
+#include <iostream>
+#include <vector>
+#include <string>
+#include <ctime>
+#include <cstdlib>
+
+using namespace std;
+
+class CoderPoint {
+public:
+    /**
+     * Initialize the application
+     */
+    static void init() {
+        cout << "🚀 Welcome to CoderPoint!" << endl;
+        cout << "CoderPoint initialized successfully!" << endl;
+        
+        displayWelcomeMessage();
+        demonstrateFeatures();
+    }
+    
+    /**
+     * Display a personalized welcome message
+     */
+    static void displayWelcomeMessage() {
+        time_t now = time(0);
+        tm* localTime = localtime(&now);
+        int hour = localTime->tm_hour;
+        string greeting;
+        
+        if (hour < 12) {
+            greeting = "Good morning! ☀️";
+        } else if (hour < 18) {
+            greeting = "Good afternoon! 🌤️";
+        } else {
+            greeting = "Good evening! 🌙";
+        }
+        
+        cout << greeting << " Ready to code?" << endl;
+    }
+    
+    /**
+     * Demonstrate C++ features
+     */
+    static void demonstrateFeatures() {
+        vector<string> features = {
+            "Smart Editor with syntax highlighting",
+            "Live Preview of your code",
+            "File Management system", 
+            "Fast code execution"
+        };
+        
+        cout << "\\n✨ Available Features:" << endl;
+        for (int i = 0; i < features.size(); i++) {
+            cout << "  " << (i + 1) << ". " << features[i] << endl;
+        }
+        
+        // Example: Calculate squares using modern C++
+        vector<int> numbers = {1, 2, 3, 4, 5};
+        cout << "\\n📊 Squares: ";
+        for (const auto& num : numbers) {
+            cout << num * num << " ";
+        }
+        cout << endl;
+    }
+    
+    /**
+     * Start the coding session
+     */
+    static void startCoding() {
+        vector<string> messages = {
+            "🎉 Let's build something amazing!",
+            "🚀 Launching your coding journey...",
+            "💡 Time to turn ideas into code!",
+            "👨‍💻 Welcome to the developer zone!"
+        };
+        
+        srand(time(0));
+        string randomMessage = messages[rand() % messages.size()];
+        cout << "\\n" << randomMessage << endl;
+    }
+    
+    /**
+     * Utility method to calculate factorial
+     */
+    static int factorial(int n) {
+        if (n == 0) return 1;
+        return n * factorial(n - 1);
+    }
+    
+    /**
+     * Utility method to generate Fibonacci sequence
+     */
+    static vector<int> fibonacci(int n) {
+        vector<int> sequence;
+        if (n >= 1) sequence.push_back(0);
+        if (n >= 2) sequence.push_back(1);
+        
+        for (int i = 2; i < n; i++) {
+            sequence.push_back(sequence[i-1] + sequence[i-2]);
+        }
+        return sequence;
+    }
+};
+
+int main() {
+    // Initialize and run CoderPoint
+    CoderPoint::init();
+    CoderPoint::startCoding();
+    
+    // Demonstrate utilities
+    cout << "\\n🔢 Factorial of 5: " << CoderPoint::factorial(5) << endl;
+    
+    vector<int> fib = CoderPoint::fibonacci(10);
+    cout << "📈 Fibonacci sequence: ";
+    for (int num : fib) {
+        cout << num << " ";
+    }
+    cout << endl;
+    
+    return 0;
+}`,
+
+    // Ruby
+    'rb': `# CoderPoint - Ruby File
+# Welcome to CoderPoint! Start your Pratics Today!
+
+puts "🚀 Welcome to CoderPoint!"
+
+def init
+  # Initialize the application
+  puts "CoderPoint initialized successfully!"
+  
+  # Add interactive features
+  display_welcome_message
+  demonstrate_features
+end
+
+def display_welcome_message
+  # Display a personalized welcome message
+  hour = Time.now.hour
+  
+  greeting = if hour < 12
+    "Good morning! ☀️"
+  elsif hour < 18
+    "Good afternoon! 🌤️"
+  else
+    "Good evening! 🌙"
+  end
+  
+  puts "#{greeting} Ready to code?"
+end
+
+def demonstrate_features
+  # Demonstrate some Ruby features
+  features = [
+    "Smart Editor with syntax highlighting",
+    "Live Preview of your code",
+    "File Management system",
+    "Fast code execution"
+  ]
+  
+  puts "\\n✨ Available Features:"
+  features.each_with_index do |feature, index|
+    puts "  #{index + 1}. #{feature}"
+  end
+  
+  # Example Ruby magic
+  numbers = [1, 2, 3, 4, 5]
+  squares = numbers.map { |x| x**2 }
+  puts "\\n📊 Example: Squares of #{numbers} are #{squares}"
+end
+
+def start_coding
+  # Start the coding session with motivation!
+  messages = [
+    "🎉 Let's build something amazing!",
+    "🚀 Launching your coding journey...", 
+    "💡 Time to turn ideas into code!",
+    "👨‍💻 Welcome to the developer zone!"
+  ]
+  
+  random_message = messages.sample
+  puts "\\n#{random_message}"
+  
+  random_message
+end
+
+# Utility methods
+def calculate_fibonacci(n)
+  # Calculate Fibonacci sequence up to n numbers
+  sequence = [0, 1]
+  (2...n).each do |i|
+    sequence << sequence[i-1] + sequence[i-2]
+  end
+  sequence[0...n]
+end
+
+def format_file_size(bytes)
+  # Format file size in human-readable format
+  units = ['B', 'KB', 'MB', 'GB']
+  size = bytes.to_f
+  units.each do |unit|
+    return "#{size.round(2)} #{unit}" if size < 1024
+    size /= 1024
+  end
+  "#{size.round(2)} TB"
+end
+
+# Main execution
+if __FILE__ == $0
+  init
+  start_coding
+  
+  # Demonstrate fibonacci
+  fib_sequence = calculate_fibonacci(10)
+  puts "\\n🔢 Fibonacci sequence: #{fib_sequence}"
+end`,
+
+    // PHP
+    'php': `<?php
+/**
+ * CoderPoint - PHP File
+ * Welcome to CoderPoint! Start your Pratics Today!
+ */
+
+echo "🚀 Welcome to CoderPoint!\\n";
+
+/**
+ * Initialize the application
+ */
+function init() {
+    echo "CoderPoint initialized successfully!\\n";
+    
+    // Add interactive features
+    displayWelcomeMessage();
+    demonstrateFeatures();
+}
+
+/**
+ * Display a personalized welcome message
+ */
+function displayWelcomeMessage() {
+    $hour = date('H');
+    
+    if ($hour < 12) {
+        $greeting = "Good morning! ☀️";
+    } else if ($hour < 18) {
+        $greeting = "Good afternoon! 🌤️";
+    } else {
+        $greeting = "Good evening! 🌙";
+    }
+    
+    echo $greeting . " Ready to code?\\n";
+}
+
+/**
+ * Demonstrate PHP features
+ */
+function demonstrateFeatures() {
+    $features = [
+        "Smart Editor with syntax highlighting",
+        "Live Preview of your code",
+        "File Management system",
+        "Fast code execution"
+    ];
+    
+    echo "\\n✨ Available Features:\\n";
+    foreach ($features as $index => $feature) {
+        echo "  " . ($index + 1) . ". " . $feature . "\\n";
+    }
+    
+    // Example data processing
+    $numbers = [1, 2, 3, 4, 5];
+    $squares = array_map(function($x) { return $x * $x; }, $numbers);
+    echo "\\n📊 Example: Squares of " . implode(', ', $numbers) . " are " . implode(', ', $squares) . "\\n";
+}
+
+/**
+ * Start the coding session
+ */
+function startCoding() {
+    $messages = [
+        "🎉 Let's build something amazing!",
+        "🚀 Launching your coding journey...",
+        "💡 Time to turn ideas into code!",
+        "👨‍💻 Welcome to the developer zone!"
+    ];
+    
+    $randomMessage = $messages[array_rand($messages)];
+    echo "\\n" . $randomMessage . "\\n";
+    
+    return $randomMessage;
+}
+
+/**
+ * Utility function to calculate factorial
+ */
+function factorial($n) {
+    if ($n == 0) return 1;
+    return $n * factorial($n - 1);
+}
+
+/**
+ * Utility function to check if number is prime
+ */
+function isPrime($num) {
+    if ($num <= 1) return false;
+    for ($i = 2; $i <= sqrt($num); $i++) {
+        if ($num % $i == 0) return false;
+    }
+    return true;
+}
+
+// Main execution
+if (isset($argv[0]) && basename($argv[0]) == basename(__FILE__)) {
+    init();
+    startCoding();
+    
+    // Demonstrate factorial
+    echo "\\n🔢 Factorial of 5: " . factorial(5) . "\\n";
+}
+?>`,
+    
     // Default template for other file types
     'default': `// Welcome to CoderPoint!
 // This is your new ${getLanguageFromExtension(filename)} file
