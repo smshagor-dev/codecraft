@@ -1,609 +1,939 @@
 import {
-    Box,
-    VStack,
-    HStack,
-    Text,
-    Button,
-    useColorMode,
-    IconButton,
-    Tooltip,
-    Badge,
-    Alert,
-    AlertIcon,
-    AlertDescription,
-    Spinner,
-    Tabs,
-    TabList,
-    TabPanels,
-    Tab,
-    TabPanel,
-    Code,
-    Flex,
-    Progress,
-    useToast
-  } from "@chakra-ui/react";
-  import { FaDownload, FaExpand, FaCompress, FaImage, FaCode, FaChartLine, FaPlay, FaSync } from "react-icons/fa";
-  import { useState, useRef, useEffect } from "react";
-  
-  export const GraphicalOutput = ({ output, language, isLoading, executionData }) => {
-    const { colorMode } = useColorMode();
-    const toast = useToast();
-    const [isFullscreen, setIsFullscreen] = useState(false);
-    const imageRef = useRef(null);
-    const [graphicalData, setGraphicalData] = useState(null);
-    const [isGeneratingGraph, setIsGeneratingGraph] = useState(false);
-    const [graphQuality, setGraphQuality] = useState(2);
+  Box,
+  VStack,
+  HStack,
+  Text,
+  Button,
+  useColorMode,
+  IconButton,
+  Tooltip,
+  Badge,
+  Alert,
+  AlertIcon,
+  AlertDescription,
+  Spinner,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
+  Code,
+  Flex,
+  Progress,
+  useToast,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  useDisclosure,
+  ButtonGroup  // ADD THIS IMPORT
+} from "@chakra-ui/react";
+import { 
+  FaDownload, 
+  FaExpand, 
+  FaCompress, 
+  FaImage, 
+  FaCode, 
+  FaChartLine, 
+  FaPlay, 
+  FaSync,
+  FaEye,
+  FaTimes,
+  FaChartBar,
+  FaChartArea,
+  FaWaveSquare
+} from "react-icons/fa";
+import { useState, useRef, useEffect } from "react";
 
-    // SUPER SENSITIVE graphical data extraction
-    const extractGraphicalData = () => {
-      if (!output || output.trim().length === 0) {
-        return {
-          type: 'text',
-          data: '',
-          hasGraph: false,
-          confidence: 0
-        };
-      }
-
-      console.log('🔍 Analyzing output for graphical patterns:', output.substring(0, 500));
-
-      // Convert output to lowercase for case-insensitive matching
-      const outputLower = output.toLowerCase();
-      
-      // EXTREMELY SENSITIVE detection patterns
-      const patterns = [
-        // Any data arrays or numerical patterns
-        { pattern: /\[[\d\s\.,]+\]/g, weight: 8, type: 'numerical_array' },
-        { pattern: /x\s*[:=]\s*\[/, weight: 9, type: 'x_data' },
-        { pattern: /y\s*[:=]\s*\[/, weight: 9, type: 'y_data' },
-        { pattern: /values?\s*[:=]\s*\[/, weight: 7, type: 'values_data' },
-        { pattern: /data\s*[:=]\s*\[/, weight: 7, type: 'data_array' },
-        
-        // Any plotting/visualization keywords (very broad)
-        { pattern: /\bplot\b/i, weight: 6, type: 'plot_keyword' },
-        { pattern: /\bgraph\b/i, weight: 6, type: 'graph_keyword' },
-        { pattern: /\bchart\b/i, weight: 6, type: 'chart_keyword' },
-        { pattern: /\bvisualization\b/i, weight: 6, type: 'visualization_keyword' },
-        { pattern: /\bdraw\b/i, weight: 5, type: 'draw_keyword' },
-        { pattern: /\bshow\b/i, weight: 5, type: 'show_keyword' },
-        { pattern: /\bfigure\b/i, weight: 5, type: 'figure_keyword' },
-        
-        // Mathematical patterns
-        { pattern: /\bsin\b|\bcos\b|\btan\b|\blog\b|\bexp\b/i, weight: 4, type: 'math_function' },
-        { pattern: /\bmath\./i, weight: 4, type: 'math_library' },
-        
-        // Data generation patterns
-        { pattern: /\brange\b/i, weight: 4, type: 'range_function' },
-        { pattern: /\barray\b/i, weight: 4, type: 'array_keyword' },
-        { pattern: /\blist\b/i, weight: 4, type: 'list_keyword' },
-        
-        // Any numbers in sequence (basic numerical data)
-        { pattern: /\d+\.\d+/g, weight: 3, type: 'float_numbers' },
-        { pattern: /\b\d+\b/g, weight: 2, type: 'integer_numbers' },
-        
-        // Python-specific patterns (very broad)
-        { pattern: /\bimport\s+\w+/i, weight: 3, type: 'import_statement' },
-        { pattern: /\bprint\b/i, weight: 2, type: 'print_statement' },
-        { pattern: /plt\./i, weight: 8, type: 'matplotlib' },
-        { pattern: /matplotlib/i, weight: 8, type: 'matplotlib_lib' },
-        { pattern: /numpy|np\./i, weight: 5, type: 'numpy' },
-        { pattern: /pandas|pd\./i, weight: 5, type: 'pandas' },
-        
-        // Explicit markers (case insensitive)
-        { pattern: /graph_start/i, weight: 10, type: 'explicit_marker' },
-        { pattern: /graph_end/i, weight: 10, type: 'explicit_marker' },
-        { pattern: /matplotlib/i, weight: 9, type: 'explicit_lib' },
-        { pattern: /plotly/i, weight: 9, type: 'explicit_lib' },
-        
-        // Data analysis keywords
-        { pattern: /\banalysis\b/i, weight: 4, type: 'analysis_keyword' },
-        { pattern: /\bdata\b/i, weight: 3, type: 'data_keyword' },
-        { pattern: /\bgenerate\b/i, weight: 3, type: 'generate_keyword' },
-        { pattern: /\bsample\b/i, weight: 3, type: 'sample_keyword' },
-        
-        // FORCE DETECTION FOR PYTHON OUTPUT WITH DATA
-        { pattern: /x_values/i, weight: 10, type: 'explicit_x_data' },
-        { pattern: /y_values/i, weight: 10, type: 'explicit_y_data' },
-        { pattern: /quadratic/i, weight: 6, type: 'math_concept' },
-        { pattern: /cubic/i, weight: 6, type: 'math_concept' },
-        { pattern: /trigonometric/i, weight: 6, type: 'math_concept' },
-        { pattern: /functions?/i, weight: 5, type: 'function_concept' }
-      ];
-
-      let totalWeight = 0;
-      const matchedPatterns = [];
-      let detectedType = 'numerical_data'; // Default to numerical data
-
-      patterns.forEach(({ pattern, weight, type }) => {
-        const matches = output.match(pattern);
-        if (matches && matches.length > 0) {
-          totalWeight += weight * matches.length;
-          matchedPatterns.push({ 
-            type, 
-            pattern: pattern.toString(), 
-            matches: matches.length,
-            sample: matches[0] 
-          });
-          
-          // Prioritize more specific types
-          if (weight >= 7) {
-            detectedType = type;
-          }
-        }
-      });
-
-      // AUTO-DETECT FOR COMMON PROGRAMMING OUTPUTS
-      // If we have any arrays or numerical data, force graphical detection
-      const hasArrays = output.includes('[') && output.includes(']');
-      const hasNumbers = /\d+/.test(output);
-      const hasMathTerms = /sin|cos|tan|log|exp|quadratic|cubic|function/i.test(output);
-      
-      if ((hasArrays && hasNumbers) || hasMathTerms) {
-        totalWeight = Math.max(totalWeight, 15); // Force above threshold
-        detectedType = 'auto_detected_numerical';
-      }
-
-      // FORCE DETECTION FOR PYTHON WITH ANY DATA
-      if (language === 'python' && output.length > 50) {
-        const lineCount = output.split('\n').length;
-        if (lineCount > 5) {
-          totalWeight = Math.max(totalWeight, 20); // Very high weight for Python
-          detectedType = 'python_data_analysis';
-        }
-      }
-
-      console.log('🎯 Graphical detection results:', {
-        outputLength: output.length,
-        totalWeight,
-        matchedPatterns: matchedPatterns.length,
-        detectedType,
-        hasArrays,
-        hasNumbers,
-        hasMathTerms
-      });
-
-      // VERY LOW THRESHOLD - almost anything with data will trigger
-      const hasGraph = totalWeight >= 3; // Extremely low threshold
-      const confidence = Math.min(100, Math.max(10, totalWeight * 5)); // Minimum 10% confidence
-
+// Enhanced Visualization Detector Class
+class EnhancedVisualizationDetector {
+  static detectVisualizationCapability(output, language, code = '') {
+    if (!output || output.trim().length === 0) {
       return {
-        type: hasGraph ? detectedType : 'text',
-        data: output,
-        hasGraph: true, // FORCE GRAPHICAL FOR TESTING - CHANGE BACK TO hasGraph LATER
-        confidence: 100, // FORCE 100% FOR TESTING
-        matchedPatterns,
-        totalWeight,
-        metadata: {
-          outputLength: output.length,
-          lineCount: output.split('\n').length,
-          language: language
-        }
+        hasVisualization: false,
+        confidence: 0,
+        type: 'none',
+        reason: 'No output data'
       };
+    }
+
+    const analysis = {
+      hasVisualization: false,
+      confidence: 0,
+      type: 'unknown',
+      reasons: [],
+      dataPoints: 0,
+      patterns: [],
+      suggestedChart: 'line'
     };
 
-    // Update graphical data when output changes
-    useEffect(() => {
-      if (output && output.trim().length > 0) {
-        const data = extractGraphicalData();
-        setGraphicalData(data);
-        
-        console.log('📊 Graphical data state:', data);
-        
-        // Auto-generate graph if we have any output
-        if (data.hasGraph && imageRef.current) {
-          setTimeout(() => {
-            generateEnhancedGraph(data);
-          }, 100);
-        }
-      }
-    }, [output, language]);
+    // Convert to lowercase for case-insensitive matching
+    const outputLower = output.toLowerCase();
+    const codeLower = code.toLowerCase();
 
-    // Download image function
-    const downloadImage = () => {
-      if (imageRef.current) {
-        const canvas = imageRef.current;
-        const link = document.createElement('a');
-        link.download = `graph-${language}-${Date.now()}.png`;
-        link.href = canvas.toDataURL();
-        link.click();
-        
-        toast({
-          title: "Graph downloaded",
-          description: "The graph has been saved as PNG",
-          status: "success",
-          duration: 2000,
-          position: "top-right"
-        });
+    // Data pattern detection
+    const dataPatterns = [
+      // Array patterns
+      { pattern: /\[[\d\s\.,]+\]/g, weight: 8, type: 'numerical_array' },
+      { pattern: /x\s*[:=]\s*\[/, weight: 9, type: 'x_data' },
+      { pattern: /y\s*[:=]\s*\[/, weight: 9, type: 'y_data' },
+      { pattern: /values?\s*[:=]\s*\[/, weight: 7, type: 'values_data' },
+      { pattern: /data\s*[:=]\s*\[/, weight: 7, type: 'data_array' },
+      
+      // CSV-like data
+      { pattern: /\d+\.?\d*\s*,\s*\d+\.?\d*/g, weight: 6, type: 'csv_data' },
+      { pattern: /\d+\s+\d+/g, weight: 5, type: 'space_separated_data' },
+      
+      // Table data
+      { pattern: /\|\s*\d+\.?\d*\s*\|/g, weight: 5, type: 'table_data' },
+      
+      // JSON data
+      { pattern: /\{"x":\s*\d+/, weight: 8, type: 'json_coordinates' },
+      { pattern: /"values":\s*\[/, weight: 7, type: 'json_values' }
+    ];
+
+    // Visualization keywords in code
+    const visualizationKeywords = [
+      { pattern: /\bplot\b/, weight: 6, type: 'plot_function' },
+      { pattern: /\bgraph\b/, weight: 6, type: 'graph_function' },
+      { pattern: /\bchart\b/, weight: 6, type: 'chart_function' },
+      { pattern: /\bvisualize\b/, weight: 7, type: 'visualize_function' },
+      { pattern: /\bdraw\b/, weight: 5, type: 'draw_function' },
+      { pattern: /\bshow\b/, weight: 5, type: 'show_function' },
+      { pattern: /\bdisplay\b/, weight: 5, type: 'display_function' },
+      { pattern: /\bfigure\b/, weight: 5, type: 'figure_function' }
+    ];
+
+    // Library detection
+    const libraryPatterns = [
+      { pattern: /matplotlib|plt\./, weight: 9, type: 'matplotlib' },
+      { pattern: /seaborn|sns\./, weight: 8, type: 'seaborn' },
+      { pattern: /plotly/, weight: 8, type: 'plotly' },
+      { pattern: /ggplot/, weight: 7, type: 'ggplot' },
+      { pattern: /d3\./, weight: 8, type: 'd3' },
+      { pattern: /chart\.js/, weight: 7, type: 'chartjs' }
+    ];
+
+    // Mathematical patterns
+    const mathPatterns = [
+      { pattern: /\bsin\b|\bcos\b|\btan\b/, weight: 4, type: 'trig_function' },
+      { pattern: /\blog\b|\bexp\b/, weight: 4, type: 'math_function' },
+      { pattern: /\bmath\./, weight: 4, type: 'math_library' },
+      { pattern: /\bnumpy\b|\bnp\./, weight: 5, type: 'numpy' },
+      { pattern: /\bpandas\b|\bpd\./, weight: 5, type: 'pandas' }
+    ];
+
+    // Analyze output for data patterns
+    let totalWeight = 0;
+    dataPatterns.forEach(({ pattern, weight, type }) => {
+      const matches = output.match(pattern);
+      if (matches && matches.length > 0) {
+        totalWeight += weight * matches.length;
+        analysis.patterns.push({ type, matches: matches.length, sample: matches[0] });
+        analysis.reasons.push(`Found ${matches.length} ${type} patterns`);
       }
+    });
+
+    // Analyze code for visualization intent
+    visualizationKeywords.forEach(({ pattern, weight, type }) => {
+      if (pattern.test(codeLower)) {
+        totalWeight += weight;
+        analysis.patterns.push({ type, matches: 1, sample: 'code keyword' });
+        analysis.reasons.push(`Code contains ${type}`);
+      }
+    });
+
+    // Check for visualization libraries
+    libraryPatterns.forEach(({ pattern, weight, type }) => {
+      if (pattern.test(codeLower)) {
+        totalWeight += weight * 2; // Higher weight for libraries
+        analysis.patterns.push({ type, matches: 1, sample: 'library' });
+        analysis.reasons.push(`Using ${type} library`);
+      }
+    });
+
+    // Count numerical data points
+    const numberMatches = output.match(/\d+\.?\d*/g);
+    if (numberMatches) {
+      analysis.dataPoints = numberMatches.length;
+      if (analysis.dataPoints >= 5) {
+        totalWeight += Math.min(10, analysis.dataPoints / 5);
+        analysis.reasons.push(`Found ${analysis.dataPoints} numerical values`);
+      }
+    }
+
+    // Language-specific boosts
+    const languageBoosts = {
+      'python': 5,
+      'r': 5,
+      'javascript': 3,
+      'matlab': 4
     };
+    
+    totalWeight += languageBoosts[language] || 0;
 
-    // Parse numerical data from ANY output
-    const parseNumericalData = (output) => {
+    // Determine visualization type
+    if (totalWeight >= 10) {
+      analysis.hasVisualization = true;
+      analysis.confidence = Math.min(100, totalWeight * 3);
+      
+      // Determine best visualization type
+      if (analysis.patterns.some(p => p.type.includes('json') || p.type.includes('coordinates'))) {
+        analysis.type = 'interactive_chart';
+        analysis.suggestedChart = 'scatter';
+      } else if (analysis.patterns.some(p => p.type.includes('array') || p.type.includes('data'))) {
+        analysis.type = 'line_chart';
+        analysis.suggestedChart = 'line';
+      } else if (analysis.dataPoints > 20) {
+        analysis.type = 'scatter_plot';
+        analysis.suggestedChart = 'scatter';
+      } else if (analysis.dataPoints <= 10) {
+        analysis.type = 'bar_chart';
+        analysis.suggestedChart = 'bar';
+      } else {
+        analysis.type = 'area_chart';
+        analysis.suggestedChart = 'area';
+      }
+    } else {
+      analysis.hasVisualization = false;
+      analysis.confidence = Math.min(100, totalWeight * 2);
+    }
+
+    console.log('Visualization Analysis:', analysis);
+    return analysis;
+  }
+
+  static generateSampleData(output, chartType = 'line') {
+    // Parse numerical data from output
+    const numbers = output.match(/\d+\.?\d*/g);
+    
+    if (!numbers || numbers.length < 3) {
+      // Generate sample data based on chart type
+      const dataPoints = 20;
+      switch (chartType) {
+        case 'bar':
+          return Array.from({ length: dataPoints }, (_, i) => ({
+            x: `Point ${i + 1}`,
+            y: Math.floor(Math.random() * 100) + 10
+          }));
+        case 'scatter':
+          return Array.from({ length: dataPoints }, (_, i) => ({
+            x: i + Math.random() * 2,
+            y: Math.sin(i * 0.5) * 30 + Math.random() * 20 + 30
+          }));
+        case 'area':
+          return Array.from({ length: dataPoints }, (_, i) => ({
+            x: i,
+            y: Math.sin(i * 0.3) * 20 + Math.cos(i * 0.2) * 10 + 40
+          }));
+        default: // line
+          return Array.from({ length: dataPoints }, (_, i) => ({
+            x: i,
+            y: Math.sin(i * 0.3) * 25 + Math.random() * 10 + 25
+          }));
+      }
+    }
+
+    // Use actual numbers from output
+    return numbers.slice(0, 20).map((num, i) => ({
+      x: chartType === 'bar' ? `Value ${i + 1}` : i,
+      y: parseFloat(num) || Math.random() * 50 + 10
+    }));
+  }
+}
+
+// Main Graphical Output Component
+export const GraphicalOutput = ({ output, language, isLoading, executionData, code = '' }) => {
+  const { colorMode } = useColorMode();
+  const toast = useToast();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showVisualizationPopup, setShowVisualizationPopup] = useState(false);
+  const [visualizationAnalysis, setVisualizationAnalysis] = useState(null);
+  const [userDismissedPopup, setUserDismissedPopup] = useState(false);
+  const [isGeneratingGraph, setIsGeneratingGraph] = useState(false);
+  const [graphQuality, setGraphQuality] = useState(2);
+  const [currentChartType, setCurrentChartType] = useState('line');
+  
+  const imageRef = useRef(null);
+  const canvasRef = useRef(null);
+
+  // Analyze output for visualization capability
+  useEffect(() => {
+    if (output && output.trim().length > 0 && !userDismissedPopup) {
+      const analysis = EnhancedVisualizationDetector.detectVisualizationCapability(output, language, code);
+      setVisualizationAnalysis(analysis);
+      
+      // Set initial chart type based on analysis
+      if (analysis.hasVisualization) {
+        setCurrentChartType(analysis.suggestedChart);
+      }
+      
+      // Show popup if visualization is possible with good confidence
+      if (analysis.hasVisualization && analysis.confidence >= 40) {
+        setTimeout(() => {
+          setShowVisualizationPopup(true);
+        }, 1500);
+      }
+
+      // Auto-generate graph if we have visualization capability
+      if (analysis.hasVisualization && canvasRef.current) {
+        setTimeout(() => {
+          generateEnhancedGraph(analysis);
+        }, 500);
+      }
+    }
+  }, [output, language, code, userDismissedPopup]);
+
+  // Handle visualization popup actions
+  const handleViewVisualization = () => {
+    setShowVisualizationPopup(false);
+    if (visualizationAnalysis?.hasVisualization) {
+      generateEnhancedGraph(visualizationAnalysis);
+    }
+  };
+
+  const handleDismissPopup = () => {
+    setShowVisualizationPopup(false);
+    setUserDismissedPopup(true);
+  };
+
+  const handleDismissTemporarily = () => {
+    setShowVisualizationPopup(false);
+  };
+
+  // Generate enhanced graph
+  const generateEnhancedGraph = (analysis) => {
+    if (!canvasRef.current) return;
+    
+    setIsGeneratingGraph(true);
+    
+    setTimeout(() => {
       try {
-        console.log('📈 Parsing numerical data from output...');
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        const { width, height } = canvas;
         
-        // Method 1: Try to extract arrays with numbers
-        const arrayPattern = /\[[^\]]*?\d+[^\]]*?\]/g;
-        const arrayMatches = output.match(arrayPattern);
+        // Clear canvas
+        ctx.clearRect(0, 0, width, height);
         
-        if (arrayMatches && arrayMatches.length >= 1) {
-          console.log('Found arrays:', arrayMatches);
-          
-          let xData, yData;
-          
-          if (arrayMatches.length >= 2) {
-            // Use first two arrays as x and y
-            try {
-              xData = JSON.parse(arrayMatches[0]);
-              yData = JSON.parse(arrayMatches[1]);
-              return { xData, yData, success: true, method: 'multiple_arrays' };
-            } catch (e) {
-              // If parsing fails, generate data based on array length
-              xData = Array.from({ length: 50 }, (_, i) => i);
-              yData = Array.from({ length: 50 }, (_, i) => Math.sin(i * 0.2) * 20 + 30);
-              return { xData, yData, success: true, method: 'generated_from_count' };
-            }
-          } else {
-            // Single array - use as y data, generate x
-            try {
-              yData = JSON.parse(arrayMatches[0]);
-              xData = Array.from({ length: yData.length }, (_, i) => i);
-              return { xData, yData, success: true, method: 'single_array' };
-            } catch (e) {
-              // Fallback
-              xData = Array.from({ length: 50 }, (_, i) => i);
-              yData = Array.from({ length: 50 }, (_, i) => Math.sin(i * 0.2) * 20 + 30);
-              return { xData, yData, success: true, method: 'fallback_generated' };
-            }
-          }
-        }
+        // Generate or parse data
+        const data = EnhancedVisualizationDetector.generateSampleData(output, currentChartType);
         
-        // Method 2: Look for x: [], y: [] patterns
-        const xMatch = output.match(/x\s*:\s*(\[[^\]]*?\])/i);
-        const yMatch = output.match(/y\s*:\s*(\[[^\]]*?\])/i);
-        
-        if (xMatch && yMatch) {
-          try {
-            xData = JSON.parse(xMatch[1]);
-            yData = JSON.parse(yMatch[1]);
-            return { xData, yData, success: true, method: 'xy_pattern' };
-          } catch (e) {
-            // Continue to next method
-          }
-        }
-        
-        // Method 3: Look for variable assignments
-        const xVarMatch = output.match(/x_?values?\s*=\s*(\[[^\]]*?\])/i);
-        const yVarMatch = output.match(/y_?values?\s*=\s*(\[[^\]]*?\])/i);
-        
-        if (xVarMatch && yVarMatch) {
-          try {
-            xData = JSON.parse(xVarMatch[1]);
-            yData = JSON.parse(yVarMatch[1]);
-            return { xData, yData, success: true, method: 'variable_assignment' };
-          } catch (e) {
-            // Continue to next method
-          }
-        }
-        
-        // Method 4: Count numbers in output and generate sample data
-        const numberMatches = output.match(/\d+\.?\d*/g);
-        if (numberMatches && numberMatches.length >= 5) {
-          const dataPoints = Math.min(50, numberMatches.length);
-          xData = Array.from({ length: dataPoints }, (_, i) => i);
-          yData = Array.from({ length: dataPoints }, (_, i) => {
-            const base = Math.sin(i * 0.2) * 20;
-            const variation = Math.cos(i * 0.3) * 5;
-            return base + variation + 30;
-          });
-          return { xData, yData, success: true, method: 'number_count_generated' };
-        }
-        
-        // Method 5: Ultimate fallback - ALWAYS generate data
-        const dataPoints = 50;
-        xData = Array.from({ length: dataPoints }, (_, i) => i);
-        yData = Array.from({ length: dataPoints }, (_, i) => {
-          // Create interesting wave patterns
-          const wave1 = Math.sin(i * 0.15) * 25;
-          const wave2 = Math.cos(i * 0.25) * 10;
-          const trend = i * 0.1;
-          return wave1 + wave2 + trend + 20;
+        console.log('🎨 Generating graph with:', {
+          dataPoints: data.length,
+          chartType: currentChartType,
+          analysis: analysis.type
         });
+
+        // Background with nice gradient
+        const gradient = ctx.createLinearGradient(0, 0, width, height);
+        gradient.addColorStop(0, colorMode === 'dark' ? '#1a202c' : '#f7fafc');
+        gradient.addColorStop(1, colorMode === 'dark' ? '#2d3748' : '#edf2f7');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
         
-        console.log('Using fallback generated data');
-        return { xData, yData, success: true, method: 'forced_fallback' };
+        // Chart area
+        const margin = { top: 60, right: 40, bottom: 60, left: 60 };
+        const chartWidth = width - margin.left - margin.right;
+        const chartHeight = height - margin.top - margin.bottom;
+        
+        // Draw chart background
+        ctx.fillStyle = colorMode === 'dark' ? '#2d3748' : '#ffffff';
+        ctx.fillRect(margin.left, margin.top, chartWidth, chartHeight);
+        ctx.strokeStyle = colorMode === 'dark' ? '#4a5568' : '#e2e8f0';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(margin.left, margin.top, chartWidth, chartHeight);
+        
+        // Draw grid
+        ctx.strokeStyle = colorMode === 'dark' ? '#2d3748' : '#f1f5f9';
+        ctx.lineWidth = 1;
+        
+        for (let i = 0; i <= 8; i++) {
+          const x = margin.left + (i / 8) * chartWidth;
+          const y = margin.top + (i / 8) * chartHeight;
+          
+          // Vertical grid lines
+          ctx.beginPath();
+          ctx.moveTo(x, margin.top);
+          ctx.lineTo(x, margin.top + chartHeight);
+          ctx.stroke();
+          
+          // Horizontal grid lines
+          ctx.beginPath();
+          ctx.moveTo(margin.left, y);
+          ctx.lineTo(margin.left + chartWidth, y);
+          ctx.stroke();
+        }
+        
+        // Scale data to fit chart
+        const xValues = data.map(d => typeof d.x === 'string' ? data.indexOf(d) : d.x);
+        const yValues = data.map(d => d.y);
+        
+        const scaleX = (value) => {
+          if (currentChartType === 'bar') {
+            const index = typeof value === 'string' ? data.findIndex(d => d.x === value) : value;
+            return margin.left + (index / data.length) * chartWidth + (chartWidth / data.length) * 0.1;
+          }
+          return margin.left + (value / Math.max(...xValues)) * chartWidth;
+        };
+        
+        const scaleY = (value) => {
+          return margin.top + chartHeight - ((value - Math.min(...yValues)) / (Math.max(...yValues) - Math.min(...yValues))) * chartHeight;
+        };
+        
+        // Draw chart based on type
+        switch (currentChartType) {
+          case 'bar':
+            drawBarChart(ctx, data, scaleX, scaleY, chartWidth, data.length, margin, colorMode);
+            break;
+          case 'scatter':
+            drawScatterChart(ctx, data, scaleX, scaleY, colorMode);
+            break;
+          case 'area':
+            drawAreaChart(ctx, data, scaleX, scaleY, chartHeight, margin, colorMode);
+            break;
+          default: // line
+            drawLineChart(ctx, data, scaleX, scaleY, colorMode);
+            break;
+        }
+        
+        // Draw axes
+        ctx.strokeStyle = colorMode === 'dark' ? '#cbd5e0' : '#4a5568';
+        ctx.lineWidth = 2;
+        
+        // X-axis
+        ctx.beginPath();
+        ctx.moveTo(margin.left, margin.top + chartHeight);
+        ctx.lineTo(margin.left + chartWidth, margin.top + chartHeight);
+        ctx.stroke();
+        
+        // Y-axis
+        ctx.beginPath();
+        ctx.moveTo(margin.left, margin.top);
+        ctx.lineTo(margin.left, margin.top + chartHeight);
+        ctx.stroke();
+        
+        // Labels and title
+        ctx.fillStyle = colorMode === 'dark' ? '#e2e8f0' : '#2d3748';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText(`${language.toUpperCase()} Data Visualization - ${currentChartType.toUpperCase()} Chart`, width / 2, 15);
+        
+        ctx.font = '12px Arial';
+        ctx.fillText('X Axis', margin.left + chartWidth / 2, margin.top + chartHeight + 20);
+        
+        ctx.save();
+        ctx.translate(margin.left - 30, margin.top + chartHeight / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Y Axis', 0, 0);
+        ctx.restore();
+        
+        // Data info
+        ctx.font = '10px Arial';
+        ctx.fillStyle = colorMode === 'dark' ? '#a0aec0' : '#718096';
+        ctx.textAlign = 'left';
+        ctx.fillText(`Data points: ${data.length} | Chart: ${currentChartType} | Confidence: ${analysis.confidence}%`, margin.left, margin.top - 25);
+        
+        console.log('✅ Graph generated successfully');
         
       } catch (error) {
-        console.error('Error in parseNumericalData:', error);
-        // Ultimate fallback - always return data
-        const xData = Array.from({ length: 50 }, (_, i) => i);
-        const yData = Array.from({ length: 50 }, (_, i) => Math.sin(i * 0.2) * 20 + 30);
-        return { xData, yData, success: true, method: 'error_fallback' };
+        console.error('❌ Error generating graph:', error);
+        generateFallbackGraph();
+      } finally {
+        setIsGeneratingGraph(false);
       }
-    };
+    }, 50);
+  };
 
-    // Enhanced graph generation - ALWAYS WORKS
-    const generateEnhancedGraph = (graphData) => {
-      if (!imageRef.current) return;
+  // Chart drawing functions
+  const drawLineChart = (ctx, data, scaleX, scaleY, colorMode) => {
+    ctx.strokeStyle = '#3182ce';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    
+    data.forEach((d, i) => {
+      const pointX = scaleX(typeof d.x === 'string' ? i : d.x);
+      const pointY = scaleY(d.y);
       
-      setIsGeneratingGraph(true);
-      
-      // Small delay to ensure canvas is ready
-      setTimeout(() => {
-        try {
-          const canvas = imageRef.current;
-          const ctx = canvas.getContext('2d');
-          const { width, height } = canvas;
-          
-          // Clear canvas
-          ctx.clearRect(0, 0, width, height);
-          
-          // ALWAYS generate or parse data
-          const { xData, yData, success, method } = parseNumericalData(output);
-          
-          console.log('🎨 Generating graph with:', {
-            dataPoints: xData.length,
-            method,
-            success
-          });
-
-          // Background with nice gradient
-          const gradient = ctx.createLinearGradient(0, 0, width, height);
-          gradient.addColorStop(0, colorMode === 'dark' ? '#1a202c' : '#f7fafc');
-          gradient.addColorStop(1, colorMode === 'dark' ? '#2d3748' : '#edf2f7');
-          ctx.fillStyle = gradient;
-          ctx.fillRect(0, 0, width, height);
-          
-          // Chart area
-          const margin = { top: 60, right: 40, bottom: 60, left: 60 };
-          const chartWidth = width - margin.left - margin.right;
-          const chartHeight = height - margin.top - margin.bottom;
-          
-          // Draw chart background
-          ctx.fillStyle = colorMode === 'dark' ? '#2d3748' : '#ffffff';
-          ctx.fillRect(margin.left, margin.top, chartWidth, chartHeight);
-          ctx.strokeStyle = colorMode === 'dark' ? '#4a5568' : '#e2e8f0';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(margin.left, margin.top, chartWidth, chartHeight);
-          
-          // Draw grid
-          ctx.strokeStyle = colorMode === 'dark' ? '#2d3748' : '#f1f5f9';
-          ctx.lineWidth = 1;
-          
-          for (let i = 0; i <= 8; i++) {
-            const x = margin.left + (i / 8) * chartWidth;
-            const y = margin.top + (i / 8) * chartHeight;
-            
-            // Vertical grid lines
-            ctx.beginPath();
-            ctx.moveTo(x, margin.top);
-            ctx.lineTo(x, margin.top + chartHeight);
-            ctx.stroke();
-            
-            // Horizontal grid lines
-            ctx.beginPath();
-            ctx.moveTo(margin.left, y);
-            ctx.lineTo(margin.left + chartWidth, y);
-            ctx.stroke();
-          }
-          
-          // Scale data to fit chart
-          const scaleX = (value) => margin.left + (value / Math.max(...xData)) * chartWidth;
-          const scaleY = (value) => margin.top + chartHeight - ((value - Math.min(...yData)) / (Math.max(...yData) - Math.min(...yData))) * chartHeight;
-          
-          // Draw smooth line chart
-          ctx.strokeStyle = '#3182ce';
-          ctx.lineWidth = 3;
+      if (i === 0) {
+        ctx.moveTo(pointX, pointY);
+      } else {
+        ctx.lineTo(pointX, pointY);
+      }
+    });
+    ctx.stroke();
+    
+    // Draw data points
+    if (graphQuality >= 2) {
+      ctx.fillStyle = '#3182ce';
+      data.forEach((d, i) => {
+        if (i % 2 === 0) {
+          const pointX = scaleX(typeof d.x === 'string' ? i : d.x);
+          const pointY = scaleY(d.y);
           ctx.beginPath();
-          
-          xData.forEach((x, i) => {
-            const pointX = scaleX(x);
-            const pointY = scaleY(yData[i]);
-            
-            if (i === 0) {
-              ctx.moveTo(pointX, pointY);
-            } else {
-              ctx.lineTo(pointX, pointY);
-            }
-          });
-          ctx.stroke();
-          
-          // Draw data points for premium quality
-          if (graphQuality >= 2) {
-            ctx.fillStyle = '#3182ce';
-            xData.forEach((x, i) => {
-              if (i % 4 === 0) { // Show every 4th point
-                const pointX = scaleX(x);
-                const pointY = scaleY(yData[i]);
-                ctx.beginPath();
-                ctx.arc(pointX, pointY, 3, 0, 2 * Math.PI);
-                ctx.fill();
-              }
-            });
-          }
-          
-          // Draw axes
-          ctx.strokeStyle = colorMode === 'dark' ? '#cbd5e0' : '#4a5568';
-          ctx.lineWidth = 2;
-          
-          // X-axis
-          ctx.beginPath();
-          ctx.moveTo(margin.left, margin.top + chartHeight);
-          ctx.lineTo(margin.left + chartWidth, margin.top + chartHeight);
-          ctx.stroke();
-          
-          // Y-axis
-          ctx.beginPath();
-          ctx.moveTo(margin.left, margin.top);
-          ctx.lineTo(margin.left, margin.top + chartHeight);
-          ctx.stroke();
-          
-          // Labels and title
-          ctx.fillStyle = colorMode === 'dark' ? '#e2e8f0' : '#2d3748';
-          ctx.font = 'bold 14px Arial';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
-          ctx.fillText(`${language.toUpperCase()} Data Visualization`, width / 2, 15);
-          
-          ctx.font = '12px Arial';
-          ctx.fillText('X Axis', margin.left + chartWidth / 2, margin.top + chartHeight + 20);
-          
-          ctx.save();
-          ctx.translate(margin.left - 30, margin.top + chartHeight / 2);
-          ctx.rotate(-Math.PI / 2);
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('Y Axis', 0, 0);
-          ctx.restore();
-          
-          // Data info
-          ctx.font = '10px Arial';
-          ctx.fillStyle = colorMode === 'dark' ? '#a0aec0' : '#718096';
-          ctx.textAlign = 'left';
-          ctx.fillText(`Data points: ${xData.length} | ${method}`, margin.left, margin.top - 25);
-          
-          console.log('✅ Graph generated successfully');
-          
-        } catch (error) {
-          console.error('❌ Error generating graph:', error);
-          // Even if error, show something
-          generateFallbackGraph();
-        } finally {
-          setIsGeneratingGraph(false);
+          ctx.arc(pointX, pointY, 3, 0, 2 * Math.PI);
+          ctx.fill();
         }
-      }, 50);
-    };
+      });
+    }
+  };
 
-    const regenerateGraph = () => {
-      if (graphicalData) {
-        setGraphQuality((prev) => (prev % 3) + 1);
-        generateEnhancedGraph(graphicalData);
-        
-        toast({
-          title: `Graph quality updated`,
-          status: "info",
-          duration: 1500,
-          position: "top-right"
-        });
+  const drawBarChart = (ctx, data, scaleX, scaleY, chartWidth, dataCount, margin, colorMode) => {
+    const barWidth = (chartWidth / dataCount) * 0.8;
+    
+    data.forEach((d, i) => {
+      const x = scaleX(typeof d.x === 'string' ? i : d.x);
+      const y = scaleY(d.y);
+      const barHeight = margin.top + chartHeight - y;
+      
+      // Gradient for bars
+      const gradient = ctx.createLinearGradient(0, y, 0, margin.top + chartHeight);
+      gradient.addColorStop(0, '#4299e1');
+      gradient.addColorStop(1, '#3182ce');
+      
+      ctx.fillStyle = gradient;
+      ctx.fillRect(x, y, barWidth, barHeight);
+      
+      // Bar border
+      ctx.strokeStyle = colorMode === 'dark' ? '#2b6cb0' : '#2c5282';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, barWidth, barHeight);
+      
+      // Value labels
+      if (graphQuality >= 2 && dataCount <= 15) {
+        ctx.fillStyle = colorMode === 'dark' ? '#e2e8f0' : '#2d3748';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(d.y.toFixed(1), x + barWidth / 2, y - 5);
       }
-    };
+    });
+  };
 
-    const renderGraphicalContent = () => {
-      // FORCE GRAPHICAL MODE FOR TESTING - always show graph
-      if (!graphicalData || output?.length === 0) {
-        return (
-          <VStack spacing={4} justify="center" h="300px" opacity={0.7}>
-            <Spinner size="lg" color="purple.500" />
-            <Text>Waiting for code execution...</Text>
-            <Text fontSize="sm">Run your code to see graphical output</Text>
-          </VStack>
-        );
+  const drawScatterChart = (ctx, data, scaleX, scaleY, colorMode) => {
+    ctx.fillStyle = '#e53e3e';
+    
+    data.forEach((d, i) => {
+      const pointX = scaleX(typeof d.x === 'string' ? i : d.x);
+      const pointY = scaleY(d.y);
+      
+      ctx.beginPath();
+      ctx.arc(pointX, pointY, 4, 0, 2 * Math.PI);
+      ctx.fill();
+      
+      // Add glow effect for premium quality
+      if (graphQuality >= 3) {
+        ctx.shadowColor = '#e53e3e';
+        ctx.shadowBlur = 10;
+        ctx.fill();
+        ctx.shadowBlur = 0;
       }
+    });
+    
+    // Add trend line for better quality
+    if (graphQuality >= 2) {
+      ctx.strokeStyle = 'rgba(66, 153, 225, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      
+      const firstPointX = scaleX(typeof data[0].x === 'string' ? 0 : data[0].x);
+      const firstPointY = scaleY(data[0].y);
+      const lastPointX = scaleX(typeof data[data.length-1].x === 'string' ? data.length-1 : data[data.length-1].x);
+      const lastPointY = scaleY(data[data.length-1].y);
+      
+      ctx.moveTo(firstPointX, firstPointY);
+      ctx.lineTo(lastPointX, lastPointY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  };
 
-      // ALWAYS SHOW GRAPH - remove the condition that hides it
-      return (
-        <VStack spacing={4} align="stretch">
-          <Box
-            p={4}
-            bg={colorMode === 'dark' ? 'gray.800' : 'gray.50'}
-            borderRadius="md"
-            border="1px solid"
-            borderColor={colorMode === 'dark' ? 'gray.600' : 'gray.200'}
+  const drawAreaChart = (ctx, data, scaleX, scaleY, chartHeight, margin, colorMode) => {
+    // Create gradient for area
+    const gradient = ctx.createLinearGradient(0, margin.top, 0, margin.top + chartHeight);
+    gradient.addColorStop(0, 'rgba(72, 187, 120, 0.8)');
+    gradient.addColorStop(1, 'rgba(72, 187, 120, 0.2)');
+    
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    
+    data.forEach((d, i) => {
+      const pointX = scaleX(typeof d.x === 'string' ? i : d.x);
+      const pointY = scaleY(d.y);
+      
+      if (i === 0) {
+        ctx.moveTo(pointX, margin.top + chartHeight);
+        ctx.lineTo(pointX, pointY);
+      } else {
+        ctx.lineTo(pointX, pointY);
+      }
+    });
+    
+    // Close the path
+    const lastPointX = scaleX(typeof data[data.length-1].x === 'string' ? data.length-1 : data[data.length-1].x);
+    ctx.lineTo(lastPointX, margin.top + chartHeight);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Draw line on top
+    ctx.strokeStyle = '#48bb78';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    
+    data.forEach((d, i) => {
+      const pointX = scaleX(typeof d.x === 'string' ? i : d.x);
+      const pointY = scaleY(d.y);
+      
+      if (i === 0) {
+        ctx.moveTo(pointX, pointY);
+      } else {
+        ctx.lineTo(pointX, pointY);
+      }
+    });
+    ctx.stroke();
+  };
+
+  const generateFallbackGraph = () => {
+    if (!canvasRef.current) return;
+    
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const { width, height } = canvas;
+    
+    ctx.clearRect(0, 0, width, height);
+    
+    // Simple fallback message
+    ctx.fillStyle = colorMode === 'dark' ? '#2d3748' : '#f7fafc';
+    ctx.fillRect(0, 0, width, height);
+    
+    ctx.fillStyle = colorMode === 'dark' ? '#e2e8f0' : '#2d3748';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Unable to generate visualization', width / 2, height / 2);
+    
+    ctx.font = '12px Arial';
+    ctx.fillStyle = colorMode === 'dark' ? '#a0aec0' : '#718096';
+    ctx.fillText('Check console for details', width / 2, height / 2 + 30);
+  };
+
+  const regenerateGraph = () => {
+    if (visualizationAnalysis) {
+      generateEnhancedGraph(visualizationAnalysis);
+      
+      toast({
+        title: `Graph regenerated`,
+        description: `Using ${currentChartType} chart type`,
+        status: "info",
+        duration: 1500,
+        position: "top-right"
+      });
+    }
+  };
+
+  const changeChartType = (type) => {
+    setCurrentChartType(type);
+    if (visualizationAnalysis) {
+      setTimeout(() => {
+        generateEnhancedGraph(visualizationAnalysis);
+      }, 100);
+    }
+  };
+
+  const downloadImage = () => {
+    if (canvasRef.current) {
+      const canvas = canvasRef.current;
+      const link = document.createElement('a');
+      link.download = `graph-${language}-${currentChartType}-${Date.now()}.png`;
+      link.href = canvas.toDataURL();
+      link.click();
+      
+      toast({
+        title: "Graph downloaded",
+        description: "The graph has been saved as PNG",
+        status: "success",
+        duration: 2000,
+        position: "top-right"
+      });
+    }
+  };
+
+  // Visualization Popup Component
+  const VisualizationPopup = () => {
+    if (!showVisualizationPopup || !visualizationAnalysis) return null;
+
+    return (
+      <Modal isOpen={showVisualizationPopup} onClose={handleDismissTemporarily} size="md">
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
+        <ModalContent 
+          bg={colorMode === 'dark' ? 'gray.800' : 'white'}
+          border="2px solid"
+          borderColor="purple.500"
+          borderRadius="xl"
+          boxShadow="2xl"
+        >
+          <ModalHeader 
+            bg="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+            color="white"
+            borderTopLeftRadius="xl"
+            borderTopRightRadius="xl"
           >
-            <HStack justify="space-between" mb={3}>
-              <HStack spacing={2}>
-                <Badge colorScheme="green" fontSize="sm">
-                  AUTO-DETECTED
-                </Badge>
-                <Badge colorScheme="blue" fontSize="sm">
-                  {language.toUpperCase()}
-                </Badge>
-                <Badge colorScheme="purple" fontSize="sm">
-                  {graphicalData.confidence}% CONFIDENCE
-                </Badge>
+            <HStack justify="space-between">
+              <HStack spacing={3}>
+                <FaChartLine size={20} />
+                <Text fontSize="lg" fontWeight="bold">Data Visualization Available</Text>
               </HStack>
-              <HStack spacing={2}>
-                <Tooltip label="Regenerate Graph">
-                  <IconButton
-                    size="sm"
-                    icon={<FaSync />}
-                    onClick={regenerateGraph}
-                    aria-label="Regenerate graph"
-                    colorScheme="blue"
-                    isLoading={isGeneratingGraph}
-                  />
-                </Tooltip>
-                <Tooltip label="Download Graph">
-                  <IconButton
-                    size="sm"
-                    icon={<FaDownload />}
-                    onClick={downloadImage}
-                    aria-label="Download graph"
-                    colorScheme="green"
-                  />
-                </Tooltip>
-                <Tooltip label={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}>
-                  <IconButton
-                    size="sm"
-                    icon={isFullscreen ? <FaCompress /> : <FaExpand />}
-                    onClick={() => setIsFullscreen(!isFullscreen)}
-                    aria-label="Toggle fullscreen"
-                  />
-                </Tooltip>
-              </HStack>
+              <IconButton
+                icon={<FaTimes />}
+                onClick={handleDismissPopup}
+                aria-label="Close"
+                variant="ghost"
+                color="white"
+                _hover={{ bg: 'rgba(255,255,255,0.2)' }}
+                size="sm"
+              />
             </HStack>
+          </ModalHeader>
 
-            {isGeneratingGraph && (
-              <Box mb={3}>
-                <Progress size="sm" isIndeterminate colorScheme="purple" />
-                <Text fontSize="xs" textAlign="center" mt={1}>
-                  Generating visualization from {language} output...
-                </Text>
+          <ModalBody py={6}>
+            <VStack spacing={4} align="stretch">
+              <Alert status="info" borderRadius="md">
+                <AlertIcon />
+                <AlertDescription fontSize="sm">
+                  We detected data in your {language} output that can be visualized.
+                </AlertDescription>
+              </Alert>
+
+              <Box p={3} bg={colorMode === 'dark' ? 'gray.700' : 'gray.100'} borderRadius="md">
+                <VStack spacing={2} align="start">
+                  <HStack>
+                    <Badge colorScheme="green" fontSize="xs">
+                      {visualizationAnalysis.confidence}% CONFIDENCE
+                    </Badge>
+                    <Badge colorScheme="blue" fontSize="xs">
+                      {visualizationAnalysis.type.replace('_', ' ').toUpperCase()}
+                    </Badge>
+                  </HStack>
+                  
+                  <Text fontSize="sm" fontWeight="medium">
+                    Detection Details:
+                  </Text>
+                  <VStack spacing={1} align="start" pl={2}>
+                    {visualizationAnalysis.reasons.slice(0, 3).map((reason, index) => (
+                      <Text key={index} fontSize="xs" color={colorMode === 'dark' ? 'gray.300' : 'gray.600'}>
+                        • {reason}
+                      </Text>
+                    ))}
+                    {visualizationAnalysis.dataPoints > 0 && (
+                      <Text fontSize="xs" color={colorMode === 'dark' ? 'gray.300' : 'gray.600'}>
+                        • {visualizationAnalysis.dataPoints} data points found
+                      </Text>
+                    )}
+                  </VStack>
+                </VStack>
               </Box>
-            )}
 
-            <Box
-              as="canvas"
-              ref={imageRef}
-              width="100%"
-              height="400px"
-              bg={colorMode === 'dark' ? 'gray.900' : 'white'}
-              borderRadius="md"
-              border="1px solid"
-              borderColor={colorMode === 'dark' ? 'gray.600' : 'gray.300'}
-            />
-          </Box>
+              <Text fontSize="sm" color={colorMode === 'dark' ? 'gray.300' : 'gray.600'}>
+                Would you like to view an automated visualization of your data?
+              </Text>
+            </VStack>
+          </ModalBody>
 
-          <Alert status="success" borderRadius="md">
-            <AlertIcon />
-            <AlertDescription fontSize="sm">
-              <strong>Graphical output auto-generated!</strong> The system detected {language} code output and created a data visualization. 
-              {graphicalData.matchedPatterns?.length > 0 && ` Found ${graphicalData.matchedPatterns.length} graphical patterns.`}
-            </AlertDescription>
-          </Alert>
-
-          {executionData && (
-            <HStack spacing={4} justify="center" p={2} bg={colorMode === 'dark' ? 'gray.800' : 'gray.100'} borderRadius="md">
-              <Badge colorScheme="green">API: {executionData.apiUsed}</Badge>
-              <Badge colorScheme="blue">Time: {executionData.executionTime}ms</Badge>
-              <Badge colorScheme="purple">Data Points: ~50</Badge>
-              <Badge colorScheme="orange">Auto-generated</Badge>
+          <ModalFooter borderTop="1px solid" borderColor={colorMode === 'dark' ? 'gray.600' : 'gray.200'}>
+            <HStack spacing={3} justify="space-between" width="100%">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleDismissPopup}
+                color={colorMode === 'dark' ? 'gray.400' : 'gray.600'}
+              >
+                Don't Show Again
+              </Button>
+              <HStack spacing={2}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleDismissTemporarily}
+                >
+                  Later
+                </Button>
+                <Button
+                  size="sm"
+                  colorScheme="purple"
+                  leftIcon={<FaEye />}
+                  onClick={handleViewVisualization}
+                >
+                  View Visualization
+                </Button>
+              </HStack>
             </HStack>
-          )}
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+    );
+  };
+
+  // Chart type selector - FIXED with ButtonGroup import
+  const ChartTypeSelector = () => (
+    <HStack spacing={2} mb={4} p={3} bg={colorMode === 'dark' ? 'gray.800' : 'gray.50'} borderRadius="md">
+      <Text fontSize="sm" fontWeight="medium">Chart Type:</Text>
+      <ButtonGroup size="sm" isAttached variant="outline">
+        <IconButton
+          icon={<FaWaveSquare />}
+          onClick={() => changeChartType('line')}
+          colorScheme={currentChartType === 'line' ? 'blue' : 'gray'}
+          aria-label="Line Chart"
+        />
+        <IconButton
+          icon={<FaChartBar />}
+          onClick={() => changeChartType('bar')}
+          colorScheme={currentChartType === 'bar' ? 'blue' : 'gray'}
+          aria-label="Bar Chart"
+        />
+        <IconButton
+          icon={<FaChartArea />}
+          onClick={() => changeChartType('area')}
+          colorScheme={currentChartType === 'area' ? 'blue' : 'gray'}
+          aria-label="Area Chart"
+        />
+        <IconButton
+          icon={<FaChartLine />}
+          onClick={() => changeChartType('scatter')}
+          colorScheme={currentChartType === 'scatter' ? 'blue' : 'gray'}
+          aria-label="Scatter Plot"
+        />
+      </ButtonGroup>
+    </HStack>
+  );
+
+  // Main graphical content
+  const renderGraphicalContent = () => {
+    if (!visualizationAnalysis || !output) {
+      return (
+        <VStack spacing={4} justify="center" h="300px" opacity={0.7}>
+          <Spinner size="lg" color="purple.500" />
+          <Text>Waiting for code execution...</Text>
+          <Text fontSize="sm">Run your code to see graphical output</Text>
         </VStack>
       );
-    };
+    }
 
-    if (isLoading) {
+    if (!visualizationAnalysis.hasVisualization) {
       return (
-        <VStack spacing={4} justify="center" h="200px">
-          <Spinner size="xl" color="purple.500" />
-          <Text>Ready for graphical output...</Text>
+        <VStack spacing={4} justify="center" h="300px" opacity={0.7}>
+          <FaChartLine size={48} />
+          <Text>No visualization data detected</Text>
+          <Text fontSize="sm">The output doesn't contain recognizable data patterns</Text>
+          <Badge colorScheme="yellow" fontSize="xs">
+            Confidence: {visualizationAnalysis.confidence}%
+          </Badge>
         </VStack>
       );
     }
 
     return (
+      <VStack spacing={4} align="stretch">
+        <Box
+          p={4}
+          bg={colorMode === 'dark' ? 'gray.800' : 'gray.50'}
+          borderRadius="md"
+          border="1px solid"
+          borderColor={colorMode === 'dark' ? 'gray.600' : 'gray.200'}
+        >
+          <HStack justify="space-between" mb={3}>
+            <HStack spacing={2}>
+              <Badge colorScheme="green" fontSize="sm">
+                AUTO-DETECTED
+              </Badge>
+              <Badge colorScheme="blue" fontSize="sm">
+                {language.toUpperCase()}
+              </Badge>
+              <Badge colorScheme="purple" fontSize="sm">
+                {visualizationAnalysis.confidence}% CONFIDENCE
+              </Badge>
+              <Badge colorScheme="orange" fontSize="sm">
+                {currentChartType.toUpperCase()}
+              </Badge>
+            </HStack>
+            <HStack spacing={2}>
+              <Tooltip label="Regenerate Graph">
+                <IconButton
+                  size="sm"
+                  icon={<FaSync />}
+                  onClick={regenerateGraph}
+                  aria-label="Regenerate graph"
+                  colorScheme="blue"
+                  isLoading={isGeneratingGraph}
+                />
+              </Tooltip>
+              <Tooltip label="Download Graph">
+                <IconButton
+                  size="sm"
+                  icon={<FaDownload />}
+                  onClick={downloadImage}
+                  aria-label="Download graph"
+                  colorScheme="green"
+                />
+              </Tooltip>
+              <Tooltip label={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}>
+                <IconButton
+                  size="sm"
+                  icon={isFullscreen ? <FaCompress /> : <FaExpand />}
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  aria-label="Toggle fullscreen"
+                />
+              </Tooltip>
+            </HStack>
+          </HStack>
+
+          {/* Chart Type Selector - MOVED HERE */}
+          <ChartTypeSelector />
+
+          {isGeneratingGraph && (
+            <Box mb={3}>
+              <Progress size="sm" isIndeterminate colorScheme="purple" />
+              <Text fontSize="xs" textAlign="center" mt={1}>
+                Generating {currentChartType} visualization from {language} output...
+              </Text>
+            </Box>
+          )}
+
+          <Box
+            as="canvas"
+            ref={canvasRef}
+            width="100%"
+            height="400px"
+            bg={colorMode === 'dark' ? 'gray.900' : 'white'}
+            borderRadius="md"
+            border="1px solid"
+            borderColor={colorMode === 'dark' ? 'gray.600' : 'gray.300'}
+          />
+        </Box>
+
+        <Alert status="success" borderRadius="md">
+          <AlertIcon />
+          <AlertDescription fontSize="sm">
+            <strong>Graphical output auto-generated!</strong> The system detected {language} data patterns and created a {currentChartType} visualization. 
+            {visualizationAnalysis.reasons.length > 0 && ` ${visualizationAnalysis.reasons.length} patterns detected.`}
+          </AlertDescription>
+        </Alert>
+      </VStack>
+    );
+  };
+
+  return (
+    <>
+      {/* Visualization Popup */}
+      <VisualizationPopup />
+
+      {/* Main Graphical Output Component */}
       <Box
         h="100%"
         bg={colorMode === 'dark' ? 'gray.900' : 'white'}
@@ -618,9 +948,11 @@ import {
               <HStack spacing={2}>
                 <FaChartLine />
                 <Text>Graphical View</Text>
-                <Badge colorScheme="green" fontSize="xs" borderRadius="full">
-                  ✓
-                </Badge>
+                {visualizationAnalysis?.hasVisualization && (
+                  <Badge colorScheme="green" fontSize="xs" borderRadius="full">
+                    ✓
+                  </Badge>
+                )}
               </HStack>
             </Tab>
             <Tab>
@@ -654,5 +986,45 @@ import {
           </TabPanels>
         </Tabs>
       </Box>
-    );
-  };
+
+      {/* Visualization Status Indicator */}
+      {visualizationAnalysis && (
+        <Box
+          position="fixed"
+          bottom={4}
+          right={4}
+          p={3}
+          bg={colorMode === 'dark' ? 'gray.800' : 'white'}
+          borderRadius="md"
+          border="1px solid"
+          borderColor={visualizationAnalysis.hasVisualization ? 'green.500' : 'gray.300'}
+          boxShadow="lg"
+          zIndex={1000}
+          maxW="300px"
+        >
+          <HStack spacing={3}>
+            <Box
+              p={2}
+              borderRadius="full"
+              bg={visualizationAnalysis.hasVisualization ? 'green.500' : 'gray.500'}
+              color="white"
+            >
+              <FaChartLine size={14} />
+            </Box>
+            <VStack spacing={0} align="start">
+              <Text fontSize="sm" fontWeight="bold">
+                {visualizationAnalysis.hasVisualization ? 'Data Visualizable' : 'No Visual Data'}
+              </Text>
+              <Text fontSize="xs" color={colorMode === 'dark' ? 'gray.400' : 'gray.600'}>
+                {visualizationAnalysis.hasVisualization 
+                  ? `${visualizationAnalysis.confidence}% confidence` 
+                  : 'Limited visualization options'
+                }
+              </Text>
+            </VStack>
+          </HStack>
+        </Box>
+      )}
+    </>
+  );
+};

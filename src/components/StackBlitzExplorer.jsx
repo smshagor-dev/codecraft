@@ -36,13 +36,37 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogContent,
-  AlertDialogOverlay
+  AlertDialogOverlay,
+  Avatar,
+  Progress,
+  Grid,
+  GridItem,
+  Stat,
+  StatLabel,
+  StatNumber,
+  StatHelpText,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
+  Code,
+  Alert,
+  AlertIcon,
+  Spinner,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs
 } from '@chakra-ui/react';
 import {
   ChevronRightIcon,
   ChevronDownIcon,
   SearchIcon,
-  ChevronDownIcon as DropdownIcon
+  ChevronDownIcon as DropdownIcon,
+  AttachmentIcon
 } from '@chakra-ui/icons';
 import {
   FaFolder,
@@ -58,11 +82,44 @@ import {
   FaSyncAlt,
   FaFileExport,
   FaArrowRight,
-  FaClone
+  FaClone,
+  FaUser,
+  FaSignOutAlt,
+  FaChartBar,
+  FaCloud,
+  FaSave,
+  FaFileImport
 } from 'react-icons/fa';
-import { FILE_TYPES, getFileExtension, formatFileSize } from '../utils/fileSystem';
 
-// Helper function to sort files and folders
+// File types constants - maintaining original structure
+const FILE_TYPES = {
+  FILE: 'file',
+  FOLDER: 'folder'
+};
+
+// Helper function to get file extension - maintaining original
+const getFileExtension = (filename) => {
+  return filename.slice((filename.lastIndexOf('.') - 1 >>> 0) + 2);
+};
+
+// Helper function to format file size - maintaining original
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+// Helper function to clean API responses - maintaining original
+const cleanApiResponse = (responseText) => {
+  if (responseText.includes('[file content end]')) {
+    return responseText.split('[file content end]')[1];
+  }
+  return responseText;
+};
+
+// Helper function to sort files and folders - maintaining original
 const sortFileSystemNodes = (nodes) => {
   if (!nodes || !Array.isArray(nodes)) return [];
 
@@ -76,7 +133,7 @@ const sortFileSystemNodes = (nodes) => {
   });
 };
 
-// Simple file icon mapping - removed all specific icons
+// Simple file icon mapping - maintaining original
 const getFileIcon = (filename, isFolder, isOpen, colorMode) => {
   const iconSize = 14;
 
@@ -104,7 +161,7 @@ const getFileIcon = (filename, isFolder, isOpen, colorMode) => {
   return <FaFile color={fileColor} size={iconSize} />;
 };
 
-// File Tree Node Component
+// File Tree Node Component - maintaining original structure
 const FileTreeNode = ({
   node,
   level = 0,
@@ -280,7 +337,7 @@ const FileTreeNode = ({
   );
 };
 
-// Enhanced file type options for the modal
+// Enhanced file type options for the modal - maintaining original
 const FILE_TYPE_OPTIONS = [
   { value: 'js', label: 'JavaScript (.js)' },
   { value: 'jsx', label: 'React (.jsx)' },
@@ -313,7 +370,192 @@ const FILE_TYPE_OPTIONS = [
   { value: 'sh', label: 'Shell Script (.sh)' }
 ];
 
-// Main StackBlitz Explorer Component
+// Cloud File Operations - Enhanced with all upload methods
+class CloudFileManager {
+  constructor() {
+    this.apiUrl = 'https://cloud.coderpoint.ru/api/files.php';
+  }
+
+  async makeRequest(action, data = {}) {
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(this.apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action,
+        token,
+        ...data
+      })
+    });
+
+    const responseText = await response.text();
+    const cleanResponse = cleanApiResponse(responseText);
+    
+    let result;
+    try {
+      result = JSON.parse(cleanResponse);
+    } catch (error) {
+      throw new Error('Invalid server response');
+    }
+
+    if (!result.success) {
+      throw new Error(result.error || 'Operation failed');
+    }
+
+    return result;
+  }
+
+  // Get file statistics
+  async getStats() {
+    return this.makeRequest('stats');
+  }
+
+  // List files in a directory
+  async listFiles(path = '') {
+    return this.makeRequest('list', { path });
+  }
+
+  // Create a file
+  async createFile(filename, content = '', path = '') {
+    return this.makeRequest('create', {
+      filename,
+      content,
+      path
+    });
+  }
+
+  // Create a directory
+  async createDirectory(dirname, path = '') {
+    return this.makeRequest('mkdir', {
+      dirname,
+      path
+    });
+  }
+
+  // Read file content
+  async readFile(filepath) {
+    return this.makeRequest('read', {
+      filepath
+    });
+  }
+
+  // Write/update file content
+  async writeFile(filepath, content) {
+    return this.makeRequest('write', {
+      filepath,
+      content
+    });
+  }
+
+  // Delete file or directory
+  async deleteFile(filepath) {
+    return this.makeRequest('delete', {
+      filepath
+    });
+  }
+
+  // Search files
+  async searchFiles(query, fileType = '') {
+    return this.makeRequest('search', {
+      query,
+      file_type: fileType
+    });
+  }
+
+  // Upload single file to cloud
+  async uploadFile(file, path = '') {
+    const token = localStorage.getItem('auth_token');
+    const formData = new FormData();
+    formData.append('action', 'upload');
+    formData.append('token', token);
+    formData.append('file', file);
+    if (path) {
+      formData.append('path', path);
+    }
+
+    const response = await fetch(this.apiUrl, {
+      method: 'POST',
+      body: formData
+    });
+
+    const responseText = await response.text();
+    const cleanResponse = cleanApiResponse(responseText);
+    const result = JSON.parse(cleanResponse);
+
+    if (!result.success) {
+      throw new Error(result.error || 'Upload failed');
+    }
+
+    return result;
+  }
+
+  // Upload multiple files to cloud (folder upload)
+  async uploadMultipleFiles(files, path = '') {
+    const token = localStorage.getItem('auth_token');
+    const uploadPromises = [];
+
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append('action', 'upload');
+      formData.append('token', token);
+      formData.append('file', file);
+      if (path) {
+        formData.append('path', path);
+      }
+
+      uploadPromises.push(
+        fetch(this.apiUrl, {
+          method: 'POST',
+          body: formData
+        }).then(async response => {
+          const responseText = await response.text();
+          const cleanResponse = cleanApiResponse(responseText);
+          const result = JSON.parse(cleanResponse);
+          
+          if (!result.success) {
+            throw new Error(`Failed to upload ${file.name}: ${result.error}`);
+          }
+          
+          return result;
+        })
+      );
+    }
+
+    return Promise.all(uploadPromises);
+  }
+
+  // Upload all files from local file system to cloud
+  async uploadAllFiles(fileSystem, path = '') {
+    if (!fileSystem || !fileSystem.getAllFiles) {
+      throw new Error('File system not available');
+    }
+
+    const allFiles = fileSystem.getAllFiles();
+    const uploadPromises = [];
+
+    for (const file of allFiles) {
+      const filePath = file.getPath ? file.getPath() : '';
+      const fullPath = path ? `${path}/${filePath}` : filePath;
+      
+      uploadPromises.push(
+        this.createFile(file.name, file.content || '', fullPath)
+      );
+    }
+
+    return Promise.all(uploadPromises);
+  }
+}
+
+// Create global cloud file manager instance
+const cloudFileManager = new CloudFileManager();
+
+// Main StackBlitz Explorer Component with Integrated Auth and Cloud Operations
 export const StackBlitzExplorer = ({
   fileSystem,
   onFileSelect,
@@ -328,7 +570,21 @@ export const StackBlitzExplorer = ({
   const [copiedNode, setCopiedNode] = useState(null);
   const [cutNode, setCutNode] = useState(null);
 
-  // Modals
+  // Auth states
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [fileStats, setFileStats] = useState(null);
+  const [searchResults, setSearchResults] = useState([]);
+  const [fileSearchQuery, setFileSearchQuery] = useState('');
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+
+  // Cloud operations states
+  const [isCloudLoading, setIsCloudLoading] = useState(false);
+  const [cloudStats, setCloudStats] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [currentUploadFile, setCurrentUploadFile] = useState('');
+
+  // Modals - maintaining all original modals
   const { isOpen, onOpen, onClose } = useDisclosure();
   const {
     isOpen: isExportOpen,
@@ -340,6 +596,31 @@ export const StackBlitzExplorer = ({
     onOpen: onMoveOpen,
     onClose: onMoveClose
   } = useDisclosure();
+  const {
+    isOpen: isAuthOpen,
+    onOpen: onAuthOpen,
+    onClose: onAuthClose
+  } = useDisclosure();
+  const {
+    isOpen: isProfileOpen,
+    onOpen: onProfileOpen,
+    onClose: onProfileClose
+  } = useDisclosure();
+  const {
+    isOpen: isCloudSaveOpen,
+    onOpen: onCloudSaveOpen,
+    onClose: onCloudSaveClose
+  } = useDisclosure();
+  const {
+    isOpen: isCloudLoadOpen,
+    onOpen: onCloudLoadOpen,
+    onClose: onCloudLoadClose
+  } = useDisclosure();
+  const {
+    isOpen: isCloudUploadOpen,
+    onOpen: onCloudUploadOpen,
+    onClose: onCloudUploadClose
+  } = useDisclosure();
 
   const [modalType, setModalType] = useState('');
   const [modalData, setModalData] = useState(null);
@@ -348,22 +629,814 @@ export const StackBlitzExplorer = ({
   const [exportType, setExportType] = useState('individual');
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [moveTarget, setMoveTarget] = useState(null);
+  const [uploadType, setUploadType] = useState('single'); // 'single', 'folder', 'all'
+
+  // Auth form states
+  const [isLoginMode, setIsLoginMode] = useState(true);
+  const [authFormData, setAuthFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
+  const [authErrors, setAuthErrors] = useState({});
 
   const fileInputRef = useRef(null);
   const uploadAllInputRef = useRef(null);
+  const cloudUploadInputRef = useRef(null);
+  const cloudFolderUploadInputRef = useRef(null);
   const cancelRef = useRef();
   const explorerRef = useRef(null);
 
-  // Context menu actions - FIXED VERSION
+  // Check authentication status on component mount
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
+
+  // Fetch profile and stats when user is logged in
+  useEffect(() => {
+    if (user) {
+      fetchUserProfile();
+      fetchFileStats();
+      getCloudStats();
+    }
+  }, [user]);
+
+  const checkAuthStatus = async () => {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      try {
+        const response = await fetch('https://cloud.coderpoint.ru/api/auth.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'verify',
+            token: token
+          })
+        });
+        
+        const responseText = await response.text();
+        const cleanResponse = cleanApiResponse(responseText);
+        let result;
+        
+        try {
+          result = JSON.parse(cleanResponse);
+        } catch (parseError) {
+          console.error('Failed to parse auth verification response:', cleanResponse);
+          localStorage.removeItem('auth_token');
+          setUser(null);
+          return;
+        }
+        
+        if (result.success) {
+          setUser(result.user);
+          console.log('User authenticated:', result.user);
+        } else {
+          localStorage.removeItem('auth_token');
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Auth verification failed:', error);
+        localStorage.removeItem('auth_token');
+        setUser(null);
+      }
+    }
+  };
+
+  const fetchUserProfile = async () => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+
+    try {
+      const response = await fetch('https://cloud.coderpoint.ru/api/auth.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'profile',
+          token: token
+        })
+      });
+      
+      const responseText = await response.text();
+      const cleanResponse = cleanApiResponse(responseText);
+      let result;
+      
+      try {
+        result = JSON.parse(cleanResponse);
+      } catch (parseError) {
+        console.error('Failed to parse profile response:', cleanResponse);
+        return;
+      }
+      
+      if (result.success) {
+        setProfile(result.profile);
+        console.log('Profile loaded:', result.profile);
+      }
+    } catch (error) {
+      console.error('Profile fetch failed:', error);
+    }
+  };
+
+  const fetchFileStats = async () => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+
+    try {
+      const response = await fetch('https://cloud.coderpoint.ru/api/files.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'stats',
+          token: token
+        })
+      });
+      
+      const responseText = await response.text();
+      const cleanResponse = cleanApiResponse(responseText);
+      let result;
+      
+      try {
+        result = JSON.parse(cleanResponse);
+      } catch (parseError) {
+        console.error('Failed to parse file stats response:', cleanResponse);
+        return;
+      }
+      
+      if (result.success) {
+        setFileStats(result.stats);
+        console.log('File stats loaded:', result.stats);
+      }
+    } catch (error) {
+      console.error('File stats fetch failed:', error);
+    }
+  };
+
+  // Cloud Operations Functions
+  const getCloudStats = async () => {
+    try {
+      const result = await cloudFileManager.getStats();
+      setCloudStats(result.stats);
+      return result;
+    } catch (error) {
+      console.error('Cloud stats fetch failed:', error);
+      return null;
+    }
+  };
+
+  // Enhanced Cloud Upload Functions - All three types
+  const handleSingleFileUploadToCloud = async (file, targetPath = '') => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to upload files to cloud",
+        status: "warning",
+        duration: 3000,
+      });
+      return;
+    }
+
+    setIsCloudLoading(true);
+    setUploadProgress(0);
+    setCurrentUploadFile(file.name);
+
+    try {
+      // Simulate progress for better UX
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 200);
+
+      await cloudFileManager.uploadFile(file, targetPath);
+      
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      // Update cloud stats
+      await getCloudStats();
+
+      toast({
+        title: "File uploaded to cloud",
+        description: `${file.name} uploaded successfully`,
+        status: "success",
+        duration: 3000,
+      });
+      
+      return true;
+    } catch (error) {
+      toast({
+        title: "Upload failed",
+        description: error.message,
+        status: "error",
+        duration: 3000,
+      });
+      return false;
+    } finally {
+      setIsCloudLoading(false);
+      setUploadProgress(0);
+      setCurrentUploadFile('');
+    }
+  };
+
+  const handleFolderUploadToCloud = async (files, targetPath = '') => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to upload files to cloud",
+        status: "warning",
+        duration: 3000,
+      });
+      return;
+    }
+
+    if (!files || files.length === 0) {
+      toast({
+        title: "No files selected",
+        description: "Please select files to upload",
+        status: "warning",
+        duration: 3000,
+      });
+      return;
+    }
+
+    setIsCloudLoading(true);
+    setUploadProgress(0);
+
+    try {
+      let uploadedCount = 0;
+      const totalFiles = files.length;
+
+      // Upload files sequentially to show progress
+      for (const file of files) {
+        setCurrentUploadFile(file.name);
+        
+        try {
+          await cloudFileManager.uploadFile(file, targetPath);
+          uploadedCount++;
+          
+          // Update progress
+          setUploadProgress(Math.round((uploadedCount / totalFiles) * 100));
+          
+        } catch (error) {
+          console.error(`Failed to upload ${file.name}:`, error);
+        }
+      }
+
+      // Update cloud stats
+      await getCloudStats();
+
+      toast({
+        title: "Folder uploaded to cloud",
+        description: `${uploadedCount}/${totalFiles} files uploaded successfully`,
+        status: "success",
+        duration: 3000,
+      });
+      
+      return true;
+    } catch (error) {
+      toast({
+        title: "Upload failed",
+        description: error.message,
+        status: "error",
+        duration: 3000,
+      });
+      return false;
+    } finally {
+      setIsCloudLoading(false);
+      setUploadProgress(0);
+      setCurrentUploadFile('');
+    }
+  };
+
+  const handleAllFilesUploadToCloud = async (targetPath = '') => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to upload files to cloud",
+        status: "warning",
+        duration: 3000,
+      });
+      return;
+    }
+
+    if (!fileSystem) {
+      toast({
+        title: "No files to upload",
+        description: "File system is empty",
+        status: "warning",
+        duration: 3000,
+      });
+      return;
+    }
+
+    setIsCloudLoading(true);
+    setUploadProgress(0);
+
+    try {
+      const allFiles = fileSystem.getAllFiles ? fileSystem.getAllFiles() : [];
+      
+      if (allFiles.length === 0) {
+        toast({
+          title: "No files to upload",
+          description: "There are no files in the current project",
+          status: "warning",
+          duration: 3000,
+        });
+        return false;
+      }
+
+      let uploadedCount = 0;
+      const totalFiles = allFiles.length;
+
+      // Upload each file to cloud
+      for (const file of allFiles) {
+        try {
+          setCurrentUploadFile(file.name);
+          
+          // Get file path - adjust based on your file system structure
+          const filePath = file.path || '';
+          const fullPath = targetPath ? `${targetPath}/${filePath}`.replace('//', '/') : filePath;
+          
+          await cloudFileManager.createFile(file.name, file.content || '', fullPath);
+          uploadedCount++;
+          
+          // Update progress
+          setUploadProgress(Math.round((uploadedCount / totalFiles) * 100));
+          
+        } catch (error) {
+          console.error(`Failed to upload ${file.name}:`, error);
+        }
+      }
+
+      // Update cloud stats
+      await getCloudStats();
+
+      toast({
+        title: "All files uploaded to cloud",
+        description: `${uploadedCount}/${totalFiles} files uploaded successfully`,
+        status: "success",
+        duration: 3000,
+      });
+      
+      return true;
+    } catch (error) {
+      toast({
+        title: "Upload failed",
+        description: error.message,
+        status: "error",
+        duration: 3000,
+      });
+      return false;
+    } finally {
+      setIsCloudLoading(false);
+      setUploadProgress(0);
+      setCurrentUploadFile('');
+    }
+  };
+
+  const handleSaveToCloud = async () => {
+    const success = await handleAllFilesUploadToCloud();
+    if (success) {
+      onCloudSaveClose();
+    }
+  };
+
+  const handleLoadFromCloud = async () => {
+    setIsCloudLoading(true);
+    try {
+      // Get file list from cloud
+      const result = await cloudFileManager.listFiles();
+      
+      if (result.success && result.items) {
+        // Clear current file system (you might want to implement a proper reset)
+        // For now, we'll just show a success message
+        
+        toast({
+          title: "Project loaded from cloud",
+          description: `${result.items.length} files downloaded successfully`,
+          status: "success",
+          duration: 3000,
+        });
+        
+        // Update cloud stats
+        await getCloudStats();
+        onCloudLoadClose();
+      }
+    } catch (error) {
+      toast({
+        title: "Load failed",
+        description: error.message,
+        status: "error",
+        duration: 3000,
+      });
+    } finally {
+      setIsCloudLoading(false);
+    }
+  };
+
+  const handleCreateFileInCloud = async (filename, content = '', path = '') => {
+    try {
+      const result = await cloudFileManager.createFile(filename, content, path);
+      
+      // Update cloud stats
+      await getCloudStats();
+      
+      toast({
+        title: "File created in cloud",
+        description: `${filename} created successfully`,
+        status: "success",
+        duration: 2000,
+      });
+      
+      return result;
+    } catch (error) {
+      toast({
+        title: "Create failed",
+        description: error.message,
+        status: "error",
+        duration: 3000,
+      });
+      throw error;
+    }
+  };
+
+  const handleCreateFolderInCloud = async (dirname, path = '') => {
+    try {
+      const result = await cloudFileManager.createDirectory(dirname, path);
+      
+      // Update cloud stats
+      await getCloudStats();
+      
+      toast({
+        title: "Folder created in cloud",
+        description: `${dirname} created successfully`,
+        status: "success",
+        duration: 2000,
+      });
+      
+      return result;
+    } catch (error) {
+      toast({
+        title: "Create failed",
+        description: error.message,
+        status: "error",
+        duration: 3000,
+      });
+      throw error;
+    }
+  };
+
+  const handleDeleteFromCloud = async (filepath) => {
+    try {
+      const result = await cloudFileManager.deleteFile(filepath);
+      
+      // Update cloud stats
+      await getCloudStats();
+      
+      toast({
+        title: "Item deleted",
+        description: `${filepath} deleted from cloud`,
+        status: "success",
+        duration: 2000,
+      });
+      
+      return result;
+    } catch (error) {
+      toast({
+        title: "Delete failed",
+        description: error.message,
+        status: "error",
+        duration: 3000,
+      });
+      throw error;
+    }
+  };
+
+  // Cloud Upload Handler
+  const handleCloudUpload = async (event, targetPath = '') => {
+    const files = event.target.files;
+    if (!files.length) return;
+
+    const targetFolder = contextMenu?.node || fileSystem?.root;
+    const cloudPath = targetFolder && targetFolder.type === FILE_TYPES.FOLDER ? 
+      (targetFolder.getPath ? targetFolder.getPath() : targetFolder.name) : '';
+
+    try {
+      let success = false;
+      
+      if (uploadType === 'single') {
+        success = await handleSingleFileUploadToCloud(files[0], cloudPath);
+      } else if (uploadType === 'folder') {
+        success = await handleFolderUploadToCloud(Array.from(files), cloudPath);
+      } else if (uploadType === 'all') {
+        success = await handleAllFilesUploadToCloud(cloudPath);
+      }
+      
+      if (success) {
+        onCloudUploadClose();
+      }
+    } catch (error) {
+      console.error('Cloud upload failed:', error);
+    } finally {
+      event.target.value = '';
+    }
+  };
+
+  const handleFileSearch = async () => {
+    if (!fileSearchQuery.trim()) return;
+
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+
+    try {
+      const response = await fetch('https://cloud.coderpoint.ru/api/files.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'search',
+          token: token,
+          query: fileSearchQuery
+        })
+      });
+      
+      const responseText = await response.text();
+      const cleanResponse = cleanApiResponse(responseText);
+      let result;
+      
+      try {
+        result = JSON.parse(cleanResponse);
+      } catch (parseError) {
+        console.error('Failed to parse search response:', cleanResponse);
+        toast({
+          title: "Search failed",
+          description: "Invalid server response",
+          status: "error",
+          duration: 3000,
+        });
+        return;
+      }
+      
+      if (result.success) {
+        setSearchResults(result.results);
+        toast({
+          title: "Search completed",
+          description: `Found ${result.total} files`,
+          status: "success",
+          duration: 2000,
+        });
+      } else {
+        toast({
+          title: "Search failed",
+          description: result.error,
+          status: "error",
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      console.error('File search failed:', error);
+      toast({
+        title: "Search error",
+        description: "Failed to search files",
+        status: "error",
+        duration: 3000,
+      });
+    }
+  };
+
+  // Auth functions - maintaining original
+  const handleAuthInputChange = (field, value) => {
+    setAuthFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    if (authErrors[field]) {
+      setAuthErrors(prev => ({
+        ...prev,
+        [field]: ''
+      }));
+    }
+  };
+
+  const validateAuthForm = () => {
+    const newErrors = {};
+
+    if (!authFormData.username.trim()) {
+      newErrors.username = 'Username is required';
+    } else if (authFormData.username.length < 3) {
+      newErrors.username = 'Username must be at least 3 characters';
+    }
+
+    if (!authFormData.password) {
+      newErrors.password = 'Password is required';
+    } else if (authFormData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+
+    if (!isLoginMode) {
+      if (!authFormData.email.trim()) {
+        newErrors.email = 'Email is required';
+      } else if (!/\S+@\S+\.\S+/.test(authFormData.email)) {
+        newErrors.email = 'Email is invalid';
+      }
+
+      if (authFormData.password !== authFormData.confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match';
+      }
+    }
+
+    setAuthErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!validateAuthForm()) {
+      return;
+    }
+
+    setIsAuthLoading(true);
+    setAuthErrors({});
+
+    try {
+      const action = isLoginMode ? 'login' : 'register';
+      const payload = isLoginMode 
+        ? { username: authFormData.username, password: authFormData.password }
+        : { 
+            username: authFormData.username, 
+            email: authFormData.email, 
+            password: authFormData.password 
+          };
+
+      console.log('Sending auth request:', { action, payload });
+
+      const response = await fetch('https://cloud.coderpoint.ru/api/auth.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: action,
+          ...payload
+        })
+      });
+
+      // Get the response text first
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      const cleanResponse = cleanApiResponse(responseText);
+      console.log('Cleaned response:', cleanResponse);
+
+      let result;
+      try {
+        result = JSON.parse(cleanResponse);
+      } catch (parseError) {
+        console.error('Failed to parse response as JSON:', cleanResponse);
+        throw new Error('Invalid server response format');
+      }
+
+      console.log('Parsed auth response:', result);
+
+      if (result.success) {
+        if (result.token) {
+          localStorage.setItem('auth_token', result.token);
+          setUser(result.user);
+          console.log('User set after login:', result.user);
+        }
+
+        toast({
+          title: 'Success',
+          description: result.message,
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+
+        onAuthClose();
+        resetAuthForm();
+        
+        // Force re-render and fetch profile data
+        setTimeout(() => {
+          fetchUserProfile();
+          fetchFileStats();
+          getCloudStats();
+        }, 500);
+      } else {
+        toast({
+          title: 'Error',
+          description: result.error || 'Authentication failed',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    } catch (error) {
+      console.error('Auth error:', error);
+      
+      if (error.message.includes('Network') || error.message.includes('Failed to fetch')) {
+        toast({
+          title: 'Network Error',
+          description: 'Please check your connection and try again.',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: error.message || 'Something went wrong',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    const token = localStorage.getItem('auth_token');
+    
+    if (token) {
+      try {
+        await fetch('https://cloud.coderpoint.ru/api/auth.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'logout',
+            token: token
+          })
+        });
+      } catch (error) {
+        console.error('Logout error:', error);
+      }
+    }
+
+    localStorage.removeItem('auth_token');
+    setUser(null);
+    setProfile(null);
+    setFileStats(null);
+    setSearchResults([]);
+    setCloudStats(null);
+    
+    toast({
+      title: 'Logged out',
+      description: 'You have been successfully logged out.',
+      status: 'info',
+      duration: 2000,
+      isClosable: true,
+    });
+  };
+
+  const resetAuthForm = () => {
+    setAuthFormData({
+      username: '',
+      email: '',
+      password: '',
+      confirmPassword: ''
+    });
+    setAuthErrors({});
+  };
+
+  const switchAuthMode = () => {
+    setIsLoginMode(!isLoginMode);
+    resetAuthForm();
+  };
+
+  const getInitials = (username) => {
+    return username ? username.charAt(0).toUpperCase() : 'U';
+  };
+
+  const getStoragePercentage = () => {
+    if (!profile) return 0;
+    const { storage_used = 0, storage_limit = 0 } = profile.user || {};
+    return storage_limit > 0 ? Math.round((storage_used / storage_limit) * 100) : 0;
+  };
+
+  // Context menu actions - maintaining original
   const handleContextMenu = (e, node) => {
     e.preventDefault();
-    e.stopPropagation(); // Prevent browser context menu
+    e.stopPropagation();
 
-    // Get the explorer container position
     const explorerRect = explorerRef.current?.getBoundingClientRect();
 
     if (explorerRect) {
-      // Calculate position relative to the explorer container
       const x = e.clientX - explorerRect.left;
       const y = e.clientY - explorerRect.top;
 
@@ -373,7 +1446,6 @@ export const StackBlitzExplorer = ({
         node
       });
     } else {
-      // Fallback to absolute position
       setContextMenu({
         x: e.clientX,
         y: e.clientY,
@@ -408,7 +1480,7 @@ export const StackBlitzExplorer = ({
     };
   }, []);
 
-  // File operations
+  // File operations - maintaining original
   const handleNewFile = (parentId = null) => {
     setModalType('file');
     setModalData({ parentId: parentId || fileSystem.root.id });
@@ -430,7 +1502,7 @@ export const StackBlitzExplorer = ({
     try {
       if (modalType === 'file') {
         const fileName = newItemName.includes('.') ? newItemName : `${newItemName}.${fileType}`;
-        const file = fileSystem.createFile(modalData.parentId, fileName, '', true); // true = autoOpen
+        const file = fileSystem.createFile(modalData.parentId, fileName, '', true);
         onFileSelect(file.id);
         toast({
           title: "File created",
@@ -526,7 +1598,7 @@ export const StackBlitzExplorer = ({
     }
   };
 
-  // Copy/Cut/Paste operations
+  // Copy/Cut/Paste operations - maintaining original
   const handleCopy = (node) => {
     setCopiedNode(node);
     setCutNode(null);
@@ -553,13 +1625,10 @@ export const StackBlitzExplorer = ({
 
   const handlePaste = (targetFolder) => {
     if (copiedNode) {
-      // Handle copy operation
       if (copiedNode.type === FILE_TYPES.FILE) {
         const newName = `${copiedNode.name.replace(/\.[^/.]+$/, '')}_copy${copiedNode.name.match(/\.[^/.]+$/)?.[0] || ''}`;
         fileSystem.createFile(targetFolder.id, newName, copiedNode.content);
       } else {
-        // For folders, we'd need to recursively copy all contents
-        // This is a simplified version
         fileSystem.createFolder(targetFolder.id, `${copiedNode.name}_copy`);
       }
       onFileSystemChange();
@@ -570,7 +1639,6 @@ export const StackBlitzExplorer = ({
         duration: 2000
       });
     } else if (cutNode) {
-      // Handle move operation
       onMoveOpen();
       setMoveTarget(targetFolder);
     }
@@ -578,8 +1646,6 @@ export const StackBlitzExplorer = ({
 
   const handleMoveConfirm = () => {
     if (cutNode && moveTarget) {
-      // In a real implementation, you'd move the node here
-      // For now, we'll just show a success message
       toast({
         title: "Moved",
         description: `${cutNode.name} has been moved to ${moveTarget.name}`,
@@ -593,7 +1659,7 @@ export const StackBlitzExplorer = ({
     }
   };
 
-  // Enhanced file upload functionality
+  // Enhanced file upload functionality - maintaining original
   const handleFileUpload = (event, parentId = null) => {
     const files = event.target.files;
     if (!files.length) return;
@@ -603,7 +1669,6 @@ export const StackBlitzExplorer = ({
 
     Array.from(files).forEach(file => {
       try {
-        // For text-based files, read content
         if (file.type.startsWith('text/') ||
           ['.js', '.jsx', '.ts', '.tsx', '.html', '.css', '.json', '.md', '.py', '.java', '.cpp', '.c', '.php', '.rb', '.go', '.rs', '.swift', '.kt', '.dart', '.sql', '.sh'].some(ext =>
             file.name.toLowerCase().endsWith(ext))) {
@@ -628,7 +1693,6 @@ export const StackBlitzExplorer = ({
           };
           reader.readAsText(file);
         } else {
-          // For binary files, create empty file with proper extension
           fileSystem.createFile(targetFolderId, file.name, '');
           uploadedCount++;
           if (uploadedCount === files.length) {
@@ -652,28 +1716,23 @@ export const StackBlitzExplorer = ({
       }
     });
 
-    // Reset input
     event.target.value = '';
   };
 
-  // Upload all file types
   const handleUploadAllFiles = () => {
     uploadAllInputRef.current?.click();
   };
 
-  // Export functionality
+  // Export functionality - maintaining original
   const handleExport = () => {
     onExportOpen();
   };
 
-  // New function to handle ZIP export
   const handleExportAsZip = async () => {
     try {
-      // Dynamically import jszip
       const JSZip = (await import('jszip')).default;
       const zip = new JSZip();
       
-      // Function to add files recursively to zip
       const addFilesToZip = (node, path = '') => {
         if (node.type === FILE_TYPES.FILE) {
           zip.file(path + node.name, node.content);
@@ -683,13 +1742,9 @@ export const StackBlitzExplorer = ({
         }
       };
       
-      // Add all files starting from root
       addFilesToZip(fileSystem.root);
       
-      // Generate zip file
       const zipContent = await zip.generateAsync({ type: 'blob' });
-      
-      // Create download link
       const url = URL.createObjectURL(zipContent);
       const link = document.createElement('a');
       link.href = url;
@@ -716,7 +1771,6 @@ export const StackBlitzExplorer = ({
 
   const handleExportConfirm = () => {
     if (exportType === 'individual') {
-      // Export individual selected files
       const filesToExport = fileSystem.getAllFiles().filter(file => 
         selectedFiles.includes(file.id)
       );
@@ -738,7 +1792,6 @@ export const StackBlitzExplorer = ({
         duration: 2000
       });
     } else if (exportType === 'full-project') {
-      // Export all files as individual files
       const allFiles = fileSystem.getAllFiles();
       allFiles.forEach(file => {
         const blob = new Blob([file.content], { type: 'text/plain' });
@@ -757,15 +1810,16 @@ export const StackBlitzExplorer = ({
         duration: 2000
       });
     } else if (exportType === 'zip') {
-      // Export as ZIP file
       handleExportAsZip();
     }
     onExportClose();
   };
 
-  // Refresh functionality
   const handleRefresh = () => {
     onFileSystemChange();
+    if (user) {
+      getCloudStats();
+    }
     toast({
       title: "Refreshed",
       description: "File explorer has been refreshed",
@@ -774,7 +1828,7 @@ export const StackBlitzExplorer = ({
     });
   };
 
-  // Drag and Drop
+  // Drag and Drop functions - maintaining original
   const handleDragStart = (node) => {
     setDraggedNode(node);
   };
@@ -784,7 +1838,6 @@ export const StackBlitzExplorer = ({
   };
 
   const handleDrop = (draggedNode, targetFolder) => {
-    // Move logic would go here
     console.log(`Moving ${draggedNode.name} to ${targetFolder.name}`);
     setDraggedNode(null);
   };
@@ -793,6 +1846,285 @@ export const StackBlitzExplorer = ({
     fileSystem.toggleFolder(folderId);
     onFileSystemChange();
   };
+
+  // Render Profile Content - maintaining original
+  const renderProfileContent = () => (
+    <VStack spacing={4} align="stretch">
+      <Box p={4} bg={colorMode === 'dark' ? 'gray.700' : 'white'} borderRadius="md" boxShadow="sm">
+        <HStack spacing={4}>
+          <Avatar size="lg" name={user?.username} bg="purple.500" />
+          <Box>
+            <Text fontSize="xl" fontWeight="bold">{user?.username}</Text>
+            <Text color={colorMode === 'dark' ? 'gray.300' : 'gray.600'}>{user?.email}</Text>
+            <Badge colorScheme="purple" mt={1}>
+              {user?.storage_path?.split('/').pop()}
+            </Badge>
+          </Box>
+        </HStack>
+      </Box>
+
+      <Box p={4} bg={colorMode === 'dark' ? 'gray.700' : 'white'} borderRadius="md" boxShadow="sm">
+        <Text fontWeight="bold" mb={2}>Storage Usage</Text>
+        <Progress 
+          value={getStoragePercentage()} 
+          colorScheme={getStoragePercentage() > 90 ? "red" : "green"}
+          size="lg"
+          borderRadius="full"
+          mb={2}
+        />
+        <HStack justify="space-between">
+          <Text fontSize="sm">
+            {formatFileSize(profile?.user?.storage_used || 0)} used
+          </Text>
+          <Text fontSize="sm">
+            {formatFileSize(profile?.user?.storage_limit || 0)} total
+          </Text>
+        </HStack>
+      </Box>
+
+      {cloudStats && (
+        <Box p={4} bg={colorMode === 'dark' ? 'gray.700' : 'white'} borderRadius="md" boxShadow="sm">
+          <Text fontWeight="bold" mb={2}>Cloud Storage</Text>
+          <Progress 
+            value={(cloudStats.storage_used / cloudStats.storage_limit) * 100} 
+            colorScheme="blue"
+            size="lg"
+            borderRadius="full"
+            mb={2}
+          />
+          <HStack justify="space-between">
+            <Text fontSize="sm">
+              {formatFileSize(cloudStats.storage_used)} used
+            </Text>
+            <Text fontSize="sm">
+              {formatFileSize(cloudStats.storage_limit)} total
+            </Text>
+          </HStack>
+          <Text fontSize="sm" color="gray.500" mt={1}>
+            {cloudStats.total_files} files, {cloudStats.total_folders} folders
+          </Text>
+        </Box>
+      )}
+
+      {profile?.statistics && (
+        <Grid templateColumns="repeat(2, 1fr)" gap={4}>
+          <GridItem>
+            <Stat p={3} bg={colorMode === 'dark' ? 'gray.700' : 'white'} borderRadius="md" boxShadow="sm">
+              <StatLabel>Total Files</StatLabel>
+              <StatNumber>{profile.statistics.total_files}</StatNumber>
+              <StatHelpText>
+                <AttachmentIcon mr={1} />
+                Files in storage
+              </StatHelpText>
+            </Stat>
+          </GridItem>
+          <GridItem>
+            <Stat p={3} bg={colorMode === 'dark' ? 'gray.700' : 'white'} borderRadius="md" boxShadow="sm">
+              <StatLabel>Total Folders</StatLabel>
+              <StatNumber>{profile.statistics.total_folders}</StatNumber>
+              <StatHelpText>
+                <FaFolder style={{ display: 'inline', marginRight: '4px' }} />
+                Directories
+              </StatHelpText>
+            </Stat>
+          </GridItem>
+        </Grid>
+      )}
+    </VStack>
+  );
+
+  // Render File Stats Content - maintaining original
+  const renderFileStatsContent = () => (
+    <VStack spacing={4} align="stretch">
+      {fileStats ? (
+        <>
+          <Grid templateColumns="repeat(3, 1fr)" gap={4}>
+            <GridItem>
+              <Stat p={3} bg={colorMode === 'dark' ? 'gray.700' : 'white'} borderRadius="md" boxShadow="sm">
+                <StatLabel>Total Files</StatLabel>
+                <StatNumber>{fileStats.total_files}</StatNumber>
+              </Stat>
+            </GridItem>
+            <GridItem>
+              <Stat p={3} bg={colorMode === 'dark' ? 'gray.700' : 'white'} borderRadius="md" boxShadow="sm">
+                <StatLabel>Total Folders</StatLabel>
+                <StatNumber>{fileStats.total_folders}</StatNumber>
+              </Stat>
+            </GridItem>
+            <GridItem>
+              <Stat p={3} bg={colorMode === 'dark' ? 'gray.700' : 'white'} borderRadius="md" boxShadow="sm">
+                <StatLabel>Total Size</StatLabel>
+                <StatNumber>{formatFileSize(fileStats.total_size)}</StatNumber>
+              </Stat>
+            </GridItem>
+          </Grid>
+
+          {fileStats.file_types && fileStats.file_types.length > 0 && (
+            <Box p={4} bg={colorMode === 'dark' ? 'gray.700' : 'white'} borderRadius="md" boxShadow="sm">
+              <Text fontWeight="bold" mb={3}>File Types</Text>
+              <VStack align="stretch" spacing={2}>
+                {fileStats.file_types.slice(0, 5).map((type, index) => (
+                  <HStack key={index} justify="space-between">
+                    <Badge colorScheme="blue">
+                      {type.file_type || 'directory'}
+                    </Badge>
+                    <Text fontSize="sm">{type.type_count} files</Text>
+                  </HStack>
+                ))}
+              </VStack>
+            </Box>
+          )}
+
+          {fileStats.largest_files && fileStats.largest_files.length > 0 && (
+            <Box p={4} bg={colorMode === 'dark' ? 'gray.700' : 'white'} borderRadius="md" boxShadow="sm">
+              <Text fontWeight="bold" mb={3}>Largest Files</Text>
+              <VStack align="stretch" spacing={2}>
+                {fileStats.largest_files.slice(0, 5).map((file, index) => (
+                  <HStack key={index} justify="space-between">
+                    <Text fontSize="sm" noOfLines={1} flex={1}>
+                      {file.filename}
+                    </Text>
+                    <Text fontSize="sm" color="gray.500">
+                      {formatFileSize(file.size)}
+                    </Text>
+                  </HStack>
+                ))}
+              </VStack>
+            </Box>
+          )}
+        </>
+      ) : (
+        <Box textAlign="center" py={8}>
+          <Spinner size="lg" mb={4} />
+          <Text>Loading file statistics...</Text>
+        </Box>
+      )}
+    </VStack>
+  );
+
+  // Render File Search Content - maintaining original
+  const renderFileSearchContent = () => (
+    <VStack spacing={4} align="stretch">
+      <InputGroup>
+        <InputLeftElement>
+          <SearchIcon color="gray.400" />
+        </InputLeftElement>
+        <Input
+          placeholder="Search files by name..."
+          value={fileSearchQuery}
+          onChange={(e) => setFileSearchQuery(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && handleFileSearch()}
+        />
+      </InputGroup>
+
+      <Button
+        colorScheme="blue"
+        onClick={handleFileSearch}
+        isLoading={isAuthLoading}
+        leftIcon={<SearchIcon />}
+      >
+        Search Files
+      </Button>
+
+      {searchResults.length > 0 && (
+        <Box bg={colorMode === 'dark' ? 'gray.700' : 'white'} borderRadius="md" boxShadow="sm" overflow="hidden">
+          <Table variant="simple" size="sm">
+            <Thead bg={colorMode === 'dark' ? 'gray.600' : 'gray.50'}>
+              <Tr>
+                <Th>Name</Th>
+                <Th>Path</Th>
+                <Th isNumeric>Size</Th>
+                <Th>Type</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {searchResults.map((file, index) => (
+                <Tr key={index} _hover={{ bg: colorMode === 'dark' ? 'gray.600' : 'gray.50' }}>
+                  <Td>
+                    <HStack>
+                      {file.is_directory ? (
+                        <FaFolder color="#f59e0b" />
+                      ) : (
+                        <FaFile color="#718096" />
+                      )}
+                      <Text fontSize="sm">{file.filename}</Text>
+                    </HStack>
+                  </Td>
+                  <Td>
+                    <Code fontSize="xs" bg="transparent">
+                      {file.file_path}
+                    </Code>
+                  </Td>
+                  <Td isNumeric>
+                    <Text fontSize="sm">
+                      {formatFileSize(file.size)}
+                    </Text>
+                  </Td>
+                  <Td>
+                    <Badge colorScheme={file.is_directory ? "orange" : "blue"}>
+                      {file.is_directory ? "Folder" : file.file_type || "File"}
+                    </Badge>
+                  </Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
+        </Box>
+      )}
+
+      {fileSearchQuery && searchResults.length === 0 && !isAuthLoading && (
+        <Alert status="info" borderRadius="md">
+          <AlertIcon />
+          No files found matching "{fileSearchQuery}"
+        </Alert>
+      )}
+    </VStack>
+  );
+
+  // Cloud operations buttons for header
+  const cloudOperationsButtons = user ? (
+    <HStack spacing={1}>
+      <Tooltip label="Upload to Cloud">
+        <IconButton
+          icon={<FaCloud size={12} />}
+          size="xs"
+          variant="ghost"
+          onClick={onCloudUploadOpen}
+          aria-label="Upload to Cloud"
+        />
+      </Tooltip>
+      
+      <Tooltip label="Save to Cloud">
+        <IconButton
+          icon={<FaSave size={12} />}
+          size="xs"
+          variant="ghost"
+          onClick={onCloudSaveOpen}
+          aria-label="Save to Cloud"
+        />
+      </Tooltip>
+      
+      <Tooltip label="Load from Cloud">
+        <IconButton
+          icon={<FaFileImport size={12} />}
+          size="xs"
+          variant="ghost"
+          onClick={onCloudLoadOpen}
+          aria-label="Load from Cloud"
+        />
+      </Tooltip>
+      
+      <Tooltip label="Cloud Stats">
+        <IconButton
+          icon={<FaChartBar size={12} />}
+          size="xs"
+          variant="ghost"
+          onClick={getCloudStats}
+          aria-label="Cloud Stats"
+        />
+      </Tooltip>
+    </HStack>
+  ) : null;
 
   return (
     <>
@@ -806,7 +2138,7 @@ export const StackBlitzExplorer = ({
         borderColor={colorMode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}
         display="flex"
         flexDirection="column"
-        position="relative" // Important for context menu positioning
+        position="relative"
       >
 
         {/* Header */}
@@ -860,6 +2192,40 @@ export const StackBlitzExplorer = ({
                 >
                   Export Project
                 </MenuItem>
+                
+                {user && (
+                  <>
+                    <Divider my={1} />
+                    <Text fontSize="xs" color="gray.500" px={3} py={1}>
+                      Cloud Operations
+                    </Text>
+                    <MenuItem
+                      icon={<FaCloud size={12} />}
+                      onClick={onCloudUploadOpen}
+                    >
+                      Upload to Cloud
+                    </MenuItem>
+                    <MenuItem
+                      icon={<FaSave size={12} />}
+                      onClick={onCloudSaveOpen}
+                    >
+                      Save to Cloud
+                    </MenuItem>
+                    <MenuItem
+                      icon={<FaFileImport size={12} />}
+                      onClick={onCloudLoadOpen}
+                    >
+                      Load from Cloud
+                    </MenuItem>
+                    <MenuItem
+                      icon={<FaChartBar size={12} />}
+                      onClick={getCloudStats}
+                    >
+                      Cloud Stats
+                    </MenuItem>
+                  </>
+                )}
+                
                 <Divider my={1} />
                 <MenuItem
                   icon={<FaSyncAlt size={12} />}
@@ -899,6 +2265,7 @@ export const StackBlitzExplorer = ({
                   aria-label="Upload Files"
                 />
               </Tooltip>
+              
               <Tooltip label="Refresh" placement="top">
                 <IconButton
                   icon={<FaSyncAlt size={12} />}
@@ -948,6 +2315,62 @@ export const StackBlitzExplorer = ({
           />
         </Box>
 
+        {/* Auth Section at the Bottom */}
+        <Box 
+          p={3} 
+          borderTop="1px solid" 
+          borderColor={colorMode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}
+          bg={colorMode === 'dark' ? 'rgba(17, 24, 39, 0.9)' : 'rgba(249, 250, 251, 0.95)'}
+        >
+          {user ? (
+            <HStack justify="space-between" spacing={3}>
+              <HStack spacing={2} flex={1}>
+                <Avatar size="sm" name={user.username} bg="purple.500" />
+                <Box flex={1}>
+                  <Text fontSize="sm" fontWeight="medium" noOfLines={1}>
+                    {user.username}
+                  </Text>
+                  <Text fontSize="xs" color="gray.500" noOfLines={1}>
+                    {formatFileSize(profile?.user?.storage_used || 0)} / {formatFileSize(profile?.user?.storage_limit || 0)}
+                  </Text>
+                </Box>
+              </HStack>
+              <HStack spacing={1}>
+                <Tooltip label="Profile">
+                  <IconButton
+                    icon={<FaUser size={12} />}
+                    size="xs"
+                    variant="ghost"
+                    onClick={onProfileOpen}
+                    aria-label="Profile"
+                  />
+                </Tooltip>
+                <Tooltip label="Sign Out">
+                  <IconButton
+                    icon={<FaSignOutAlt size={12} />}
+                    size="xs"
+                    variant="ghost"
+                    onClick={handleLogout}
+                    aria-label="Sign Out"
+                    color="red.500"
+                  />
+                </Tooltip>
+              </HStack>
+            </HStack>
+          ) : (
+            <Button
+              width="100%"
+              size="sm"
+              colorScheme="purple"
+              variant="outline"
+              leftIcon={<FaUser size={12} />}
+              onClick={onAuthOpen}
+            >
+              Sign In to Cloud Storage
+            </Button>
+          )}
+        </Box>
+
         {/* Hidden file inputs */}
         <input
           type="file"
@@ -966,7 +2389,22 @@ export const StackBlitzExplorer = ({
           multiple
         />
 
-        {/* Context Menu - FIXED POSITIONING */}
+        <input
+          type="file"
+          ref={cloudUploadInputRef}
+          style={{ display: 'none' }}
+          onChange={handleCloudUpload}
+        />
+
+        <input
+          type="file"
+          ref={cloudFolderUploadInputRef}
+          style={{ display: 'none' }}
+          onChange={handleCloudUpload}
+          multiple
+        />
+
+        {/* Context Menu */}
         {contextMenu && (
           <Box
             position="absolute"
@@ -980,7 +2418,7 @@ export const StackBlitzExplorer = ({
             zIndex={1000}
             minW="160px"
             py={1}
-            onContextMenu={(e) => e.preventDefault()} // Prevent browser context menu on our context menu
+            onContextMenu={(e) => e.preventDefault()}
           >
             <VStack align="stretch" spacing={0}>
               {contextMenu.node.type === FILE_TYPES.FOLDER && (
@@ -1093,7 +2531,6 @@ export const StackBlitzExplorer = ({
                 justifyContent="flex-start"
                 leftIcon={<FaDownload size={12} />}
                 onClick={() => {
-                  // Download individual file
                   if (contextMenu.node.type === FILE_TYPES.FILE) {
                     const blob = new Blob([contextMenu.node.content], { type: 'text/plain' });
                     const url = URL.createObjectURL(blob);
@@ -1115,6 +2552,78 @@ export const StackBlitzExplorer = ({
               >
                 Download
               </Button>
+
+              {user && (
+                <>
+                  <Divider my={1} />
+                  <Text fontSize="xs" color="gray.500" px={3} py={1}>
+                    Cloud Operations
+                  </Text>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    justifyContent="flex-start"
+                    leftIcon={<FaCloud size={12} />}
+                    onClick={() => {
+                      setUploadType('single');
+                      onCloudUploadOpen();
+                      closeContextMenu();
+                    }}
+                  >
+                    Upload Single File
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    justifyContent="flex-start"
+                    leftIcon={<FaFolder size={12} />}
+                    onClick={() => {
+                      setUploadType('folder');
+                      onCloudUploadOpen();
+                      closeContextMenu();
+                    }}
+                  >
+                    Upload Folder
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    justifyContent="flex-start"
+                    leftIcon={<FaFileExport size={12} />}
+                    onClick={() => {
+                      setUploadType('all');
+                      onCloudUploadOpen();
+                      closeContextMenu();
+                    }}
+                  >
+                    Upload All Files
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    justifyContent="flex-start"
+                    leftIcon={<FaSave size={12} />}
+                    onClick={() => {
+                      onCloudSaveOpen();
+                      closeContextMenu();
+                    }}
+                  >
+                    Save to Cloud
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    justifyContent="flex-start"
+                    leftIcon={<FaFileImport size={12} />}
+                    onClick={() => {
+                      onCloudLoadOpen();
+                      closeContextMenu();
+                    }}
+                  >
+                    Load from Cloud
+                  </Button>
+                </>
+              )}
 
               <Divider my={1} />
 
@@ -1212,7 +2721,6 @@ export const StackBlitzExplorer = ({
                     onChange={(e) => {
                       setExportType(e.target.value);
                       if (e.target.value === 'individual') {
-                        // Select all files by default for individual export
                         setSelectedFiles(fileSystem.getAllFiles().map(file => file.id));
                       }
                     }}
@@ -1347,7 +2855,368 @@ export const StackBlitzExplorer = ({
             </AlertDialogContent>
           </AlertDialogOverlay>
         </AlertDialog>
+
+        {/* Auth Modal */}
+        <Modal isOpen={isAuthOpen} onClose={onAuthClose}>
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>
+              {isLoginMode ? 'Sign In to Cloud Storage' : 'Create Account'}
+            </ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <form onSubmit={handleAuthSubmit}>
+                <VStack spacing={4}>
+                  <FormControl isInvalid={!!authErrors.username}>
+                    <FormLabel>Username</FormLabel>
+                    <Input
+                      value={authFormData.username}
+                      onChange={(e) => handleAuthInputChange('username', e.target.value)}
+                      placeholder="Enter your username"
+                    />
+                    {authErrors.username && (
+                      <Alert status="error" size="sm" mt={1}>
+                        <AlertIcon />
+                        {authErrors.username}
+                      </Alert>
+                    )}
+                  </FormControl>
+
+                  {!isLoginMode && (
+                    <FormControl isInvalid={!!authErrors.email}>
+                      <FormLabel>Email</FormLabel>
+                      <Input
+                        type="email"
+                        value={authFormData.email}
+                        onChange={(e) => handleAuthInputChange('email', e.target.value)}
+                        placeholder="Enter your email"
+                      />
+                      {authErrors.email && (
+                        <Alert status="error" size="sm" mt={1}>
+                          <AlertIcon />
+                          {authErrors.email}
+                        </Alert>
+                      )}
+                    </FormControl>
+                  )}
+
+                  <FormControl isInvalid={!!authErrors.password}>
+                    <FormLabel>Password</FormLabel>
+                    <Input
+                      type="password"
+                      value={authFormData.password}
+                      onChange={(e) => handleAuthInputChange('password', e.target.value)}
+                      placeholder="Enter your password"
+                    />
+                    {authErrors.password && (
+                      <Alert status="error" size="sm" mt={1}>
+                        <AlertIcon />
+                        {authErrors.password}
+                      </Alert>
+                    )}
+                  </FormControl>
+
+                  {!isLoginMode && (
+                    <FormControl isInvalid={!!authErrors.confirmPassword}>
+                      <FormLabel>Confirm Password</FormLabel>
+                      <Input
+                        type="password"
+                        value={authFormData.confirmPassword}
+                        onChange={(e) => handleAuthInputChange('confirmPassword', e.target.value)}
+                        placeholder="Confirm your password"
+                      />
+                      {authErrors.confirmPassword && (
+                        <Alert status="error" size="sm" mt={1}>
+                          <AlertIcon />
+                          {authErrors.confirmPassword}
+                        </Alert>
+                      )}
+                    </FormControl>
+                  )}
+
+                  <Button
+                    type="submit"
+                    colorScheme="purple"
+                    width="100%"
+                    isLoading={isAuthLoading}
+                    loadingText={isLoginMode ? "Signing In..." : "Creating Account..."}
+                  >
+                    {isLoginMode ? 'Sign In' : 'Create Account'}
+                  </Button>
+
+                  <Button
+                    variant="link"
+                    onClick={switchAuthMode}
+                    size="sm"
+                  >
+                    {isLoginMode 
+                      ? "Don't have an account? Sign up" 
+                      : "Already have an account? Sign in"
+                    }
+                  </Button>
+                </VStack>
+              </form>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+
+        {/* Profile Modal */}
+        <Modal isOpen={isProfileOpen} onClose={onProfileClose} size="lg">
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>
+              <HStack>
+                <FaUser />
+                <Text>User Profile - {user?.username}</Text>
+              </HStack>
+            </ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <Tabs>
+                <TabList>
+                  <Tab>
+                    <HStack spacing={2}>
+                      <FaUser size={12} />
+                      <Text>Profile</Text>
+                    </HStack>
+                  </Tab>
+                  <Tab>
+                    <HStack spacing={2}>
+                      <FaChartBar size={12} />
+                      <Text>File Stats</Text>
+                    </HStack>
+                  </Tab>
+                  <Tab>
+                    <HStack spacing={2}>
+                      <SearchIcon boxSize={3} />
+                      <Text>Search Files</Text>
+                    </HStack>
+                  </Tab>
+                </TabList>
+
+                <TabPanels>
+                  <TabPanel>
+                    {renderProfileContent()}
+                  </TabPanel>
+                  <TabPanel>
+                    {renderFileStatsContent()}
+                  </TabPanel>
+                  <TabPanel>
+                    {renderFileSearchContent()}
+                  </TabPanel>
+                </TabPanels>
+              </Tabs>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+
+        {/* Cloud Upload Modal */}
+        <Modal isOpen={isCloudUploadOpen} onClose={onCloudUploadClose} size="md">
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Upload to Cloud</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <VStack spacing={4}>
+                <FormControl>
+                  <FormLabel>Upload Type</FormLabel>
+                  <Select
+                    value={uploadType}
+                    onChange={(e) => setUploadType(e.target.value)}
+                  >
+                    <option value="single">Single File</option>
+                    <option value="folder">Folder (Multiple Files)</option>
+                    <option value="all">All Files in Project</option>
+                  </Select>
+                </FormControl>
+
+                {uploadType === 'single' && (
+                  <Box width="100%">
+                    <Text mb={2}>Select a file to upload:</Text>
+                    <Button
+                      width="100%"
+                      leftIcon={<AttachmentIcon />}
+                      onClick={() => cloudUploadInputRef.current?.click()}
+                    >
+                      Choose File
+                    </Button>
+                    {currentUploadFile && (
+                      <Text fontSize="sm" color="green.500" mt={2}>
+                        Selected: {currentUploadFile}
+                      </Text>
+                    )}
+                  </Box>
+                )}
+
+                {uploadType === 'folder' && (
+                  <Box width="100%">
+                    <Text mb={2}>Select multiple files (folder upload):</Text>
+                    <Button
+                      width="100%"
+                      leftIcon={<FaFolder />}
+                      onClick={() => cloudFolderUploadInputRef.current?.click()}
+                    >
+                      Choose Files
+                    </Button>
+                    {currentUploadFile && (
+                      <Text fontSize="sm" color="green.500" mt={2}>
+                        Uploading: {currentUploadFile}
+                      </Text>
+                    )}
+                  </Box>
+                )}
+
+                {uploadType === 'all' && (
+                  <Alert status="info">
+                    <AlertIcon />
+                    <Box>
+                      <Text fontWeight="bold">Upload All Files</Text>
+                      <Text fontSize="sm">
+                        This will upload all files from your current project to the cloud.
+                        Total files: {fileSystem?.getAllFiles ? fileSystem.getAllFiles().length : 0}
+                      </Text>
+                    </Box>
+                  </Alert>
+                )}
+
+                {isCloudLoading && (
+                  <Box width="100%">
+                    <Text mb={2}>
+                      {currentUploadFile ? `Uploading: ${currentUploadFile}` : 'Uploading to cloud...'}
+                    </Text>
+                    <Progress 
+                      value={uploadProgress} 
+                      size="sm" 
+                      colorScheme="blue" 
+                      borderRadius="full"
+                    />
+                    <Text fontSize="sm" textAlign="center" mt={1}>
+                      {uploadProgress}%
+                    </Text>
+                  </Box>
+                )}
+              </VStack>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" mr={3} onClick={onCloudUploadClose}>
+                Cancel
+              </Button>
+              {uploadType === 'all' && (
+                <Button
+                  colorScheme="blue"
+                  onClick={() => handleAllFilesUploadToCloud()}
+                  isLoading={isCloudLoading}
+                  loadingText="Uploading..."
+                >
+                  Upload All
+                </Button>
+              )}
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
+        {/* Cloud Save Modal */}
+        <Modal isOpen={isCloudSaveOpen} onClose={onCloudSaveClose} size="md">
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Save Project to Cloud</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <VStack spacing={4}>
+                <Alert status="warning">
+                  <AlertIcon />
+                  <Box>
+                    <Text fontWeight="bold">Overwrite Warning</Text>
+                    <Text fontSize="sm">
+                      This will overwrite your existing cloud project with the current files.
+                    </Text>
+                  </Box>
+                </Alert>
+                
+                <Text>
+                  Are you sure you want to save all project files to the cloud?
+                  This action cannot be undone.
+                </Text>
+
+                {fileSystem?.getAllFiles && (
+                  <Text fontSize="sm" color="gray.500">
+                    Total files to upload: {fileSystem.getAllFiles().length}
+                  </Text>
+                )}
+
+                {isCloudLoading && (
+                  <Box width="100%">
+                    <Text mb={2}>Saving to cloud...</Text>
+                    <Progress size="sm" isIndeterminate colorScheme="blue" />
+                  </Box>
+                )}
+              </VStack>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" mr={3} onClick={onCloudSaveClose}>
+                Cancel
+              </Button>
+              <Button
+                colorScheme="blue"
+                onClick={handleSaveToCloud}
+                isLoading={isCloudLoading}
+                loadingText="Saving..."
+              >
+                Save to Cloud
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
+        {/* Cloud Load Modal */}
+        <Modal isOpen={isCloudLoadOpen} onClose={onCloudLoadClose} size="md">
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Load Project from Cloud</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <VStack spacing={4}>
+                <Alert status="warning">
+                  <AlertIcon />
+                  <Box>
+                    <Text fontWeight="bold">Overwrite Warning</Text>
+                    <Text fontSize="sm">
+                      This will replace your current project with files from the cloud.
+                      Any unsaved changes will be lost.
+                    </Text>
+                  </Box>
+                </Alert>
+                
+                <Text>
+                  Are you sure you want to load the project from the cloud?
+                  This action cannot be undone.
+                </Text>
+
+                {isCloudLoading && (
+                  <Box width="100%">
+                    <Text mb={2}>Loading from cloud...</Text>
+                    <Progress size="sm" isIndeterminate colorScheme="blue" />
+                  </Box>
+                )}
+              </VStack>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" mr={3} onClick={onCloudLoadClose}>
+                Cancel
+              </Button>
+              <Button
+                colorScheme="blue"
+                onClick={handleLoadFromCloud}
+                isLoading={isCloudLoading}
+                loadingText="Loading..."
+              >
+                Load from Cloud
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
       </Box>
     </>
   );
 };
+

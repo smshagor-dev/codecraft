@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Box,
   Button,
@@ -22,7 +22,13 @@ import {
   Grid,
   GridItem,
   Spinner,
-  useDisclosure
+  useDisclosure,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalCloseButton
 } from "@chakra-ui/react";
 import { 
   FaPlay, 
@@ -150,6 +156,13 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
   const [isRocketMode, setIsRocketMode] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
   const [compilerStatus, setCompilerStatus] = useState('ready');
+  const [showGraphicalModal, setShowGraphicalModal] = useState(false);
+  
+  // NEW: Active tab state management
+  const [activeTab, setActiveTab] = useState(0);
+  const [hasOutput, setHasOutput] = useState(false);
+  const [hasGraphicalData, setHasGraphicalData] = useState(false);
+  const [executionResult, setExecutionResult] = useState(null);
 
   // Create default handlers if not provided
   const handleFileSelect = onFileSelect || (() => {
@@ -193,6 +206,69 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
     return analyzeInputRequirements(sourceCode, language);
   };
 
+  // NEW: Auto-switch to appropriate tab based on output type
+  const autoSwitchTab = (result, outputText, hasError) => {
+    setHasOutput(true);
+    
+    // Check if output has graphical data patterns
+    const hasGraphicalPatterns = checkForGraphicalData(outputText);
+    setHasGraphicalData(hasGraphicalPatterns);
+    
+    if (hasError) {
+      // Switch to Problems tab for errors
+      setActiveTab(3); // Problems tab
+      toast({
+        title: "Execution completed with errors",
+        description: "Switched to Problems tab",
+        status: "warning",
+        duration: 2000,
+        position: "top-right"
+      });
+    } else if (hasGraphicalPatterns) {
+      // Switch to Graphical tab for visualizable data
+      setActiveTab(2); // Graphical tab
+      toast({
+        title: "Graphical data detected",
+        description: "Switched to Graphical tab",
+        status: "info",
+        duration: 2000,
+        position: "top-right"
+      });
+    } else if (outputText && outputText.length > 0) {
+      // Switch to Output tab for regular output
+      setActiveTab(1); // Output tab
+      toast({
+        title: "Execution completed",
+        description: "Switched to Output tab",
+        status: "success",
+        duration: 1500,
+        position: "top-right"
+      });
+    }
+  };
+
+  // Check if output contains graphical data patterns
+  const checkForGraphicalData = (outputText) => {
+    if (!outputText) return false;
+    
+    const graphicalPatterns = [
+      /\[[\d\s\.,]+\]/, // Arrays
+      /x\s*[:=]\s*\[/, // X data
+      /y\s*[:=]\s*\[/, // Y data
+      /values?\s*[:=]\s*\[/, // Values
+      /data\s*[:=]\s*\[/, // Data arrays
+      /\d+\.?\d*\s*,\s*\d+\.?\d*/, // CSV-like data
+      /\{"x":\s*\d+/, // JSON coordinates
+      /"values":\s*\[/, // JSON values
+      /plt\./, // Matplotlib
+      /plot\(/, // Plot function
+      /graph_start/, // Explicit markers
+      /graph_end/ // Explicit markers
+    ];
+    
+    return graphicalPatterns.some(pattern => pattern.test(outputText));
+  };
+
   // Handle run code with input modal logic
   const handleRunCode = (turboMode = false) => {
     let sourceCode = '';
@@ -223,6 +299,13 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
     }
 
     console.log('Code to execute:', sourceCode.substring(0, 100) + '...');
+
+    // Reset output state
+    setOutput("");
+    setError(null);
+    setLogs([]);
+    setHasOutput(false);
+    setHasGraphicalData(false);
 
     // Analyze input requirements for ALL languages
     const detectedInputFields = analyzeCodeForInput();
@@ -300,12 +383,15 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
       }
       
       // Handle API response properly
+      let finalOutput = '';
+      let finalError = '';
+      
       if (result.run) {
         const { output, stdout, stderr } = result.run;
         
         // Combine output sources - prioritize stdout, then output
-        const finalOutput = stdout || output || '';
-        const finalError = stderr || '';
+        finalOutput = stdout || output || '';
+        finalError = stderr || '';
         
         if (finalError) {
           setError(finalError);
@@ -350,20 +436,31 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
         }
       } else {
         // Handle case where result structure is different
-        const outputText = result.output || JSON.stringify(result, null, 2);
-        setOutput(outputText);
-        const successLogs = parseOutput(outputText);
+        finalOutput = result.output || JSON.stringify(result, null, 2);
+        setOutput(finalOutput);
+        const successLogs = parseOutput(finalOutput);
         setLogs(prev => [...prev, ...successLogs]);
         setCompilerStatus('success');
       }
+      
+      // NEW: Auto-switch to appropriate tab
+      autoSwitchTab(result, finalOutput || finalError, !!finalError);
       
       setMetrics(prev => ({
         ...prev,
         executionTime,
         memoryUsage: turboMode ? Math.round(Math.random() * 30 + 5) : Math.round(Math.random() * 50 + 10),
         cpuUsage: turboMode ? Math.round(Math.random() * 20 + 3) : Math.round(Math.random() * 30 + 5),
-        successRate: error ? 0 : 100
+        successRate: finalError ? 0 : 100
       }));
+      
+      // Store execution result for graphical output
+      setExecutionResult({
+        apiUsed: result.apiUsed || 'unknown',
+        executionTime,
+        success: !finalError,
+        hasGraphicalData: checkForGraphicalData(finalOutput || finalError)
+      });
       
     } catch (error) {
       console.error('Execution error:', error);
@@ -392,6 +489,9 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
           }
         });
       }
+      
+      // NEW: Auto-switch to Problems tab for errors
+      autoSwitchTab(null, errorMessage, true);
       
       setMetrics(prev => ({ ...prev, successRate: 0 }));
       setCompilerStatus('error');
@@ -434,6 +534,9 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
     setError(null);
     setUserInput('');
     setCompilerStatus('ready');
+    setHasOutput(false);
+    setHasGraphicalData(false);
+    setActiveTab(0); // Reset to Console tab
   };
 
   const copyOutput = () => {
@@ -595,13 +698,13 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
                   {inputFieldsCount} Input{inputFieldsCount > 1 ? 's' : ''}
                 </Badge>
               )}
-              {output && (
+              {hasOutput && (
                 <Badge
                   colorScheme="blue"
                   variant="subtle"
                   fontSize="xs"
                 >
-                  API: {logs.find(log => log.message.includes('Executed using'))?.message.replace('✅ Executed using ', '').replace(' API', '') || 'CoderPoint'}
+                  {compilerStatus === 'success' ? 'EXECUTED' : 'READY'}
                 </Badge>
               )}
             </HStack>
@@ -829,15 +932,68 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
 
       {/* Main Content Area */}
       <Box flex={1} overflow="hidden">
-        <Tabs colorScheme="purple" size="sm" h="100%" display="flex" flexDirection="column">
+        <Tabs 
+          colorScheme="purple" 
+          size="sm" 
+          h="100%" 
+          display="flex" 
+          flexDirection="column"
+          index={activeTab}
+          onChange={setActiveTab}
+        >
           <TabList px={4} borderBottom="1px solid" 
             borderColor={colorMode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}
           >
-            <Tab>Console ({logs.length})</Tab>
-            <Tab>Output</Tab>
-            <Tab>Graphical</Tab>
-            <Tab>Problems</Tab>
-            <Tab>Terminal</Tab>
+            <Tab>
+              <HStack spacing={2}>
+                <FaTerminal />
+                <Text>Console</Text>
+                {logs.length > 0 && (
+                  <Badge colorScheme="purple" fontSize="xs" borderRadius="full" minW="5">
+                    {logs.length}
+                  </Badge>
+                )}
+              </HStack>
+            </Tab>
+            <Tab>
+              <HStack spacing={2}>
+                <FaCode />
+                <Text>Output</Text>
+                {output && (
+                  <Badge colorScheme="green" fontSize="xs" borderRadius="full" minW="5">
+                    ✓
+                  </Badge>
+                )}
+              </HStack>
+            </Tab>
+            <Tab>
+              <HStack spacing={2}>
+                <FaChartLine />
+                <Text>Graphical</Text>
+                {hasGraphicalData && (
+                  <Badge colorScheme="blue" fontSize="xs" borderRadius="full" minW="5">
+                    📊
+                  </Badge>
+                )}
+              </HStack>
+            </Tab>
+            <Tab>
+              <HStack spacing={2}>
+                <FaExclamationTriangle />
+                <Text>Problems</Text>
+                {error && (
+                  <Badge colorScheme="red" fontSize="xs" borderRadius="full" minW="5">
+                    !
+                  </Badge>
+                )}
+              </HStack>
+            </Tab>
+            <Tab>
+              <HStack spacing={2}>
+                <FaTerminal />
+                <Text>Terminal</Text>
+              </HStack>
+            </Tab>
             <Flex flex={1} justify="flex-end" align="center">
               <HStack spacing={2}>
                 <Tooltip label="Clear Console">
@@ -867,11 +1023,27 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
                     aria-label="Download"
                   />
                 </Tooltip>
+                {hasGraphicalData && (
+                  <Tooltip label="Open Graphical View">
+                    <IconButton
+                      size="xs"
+                      icon={<FaChartLine />}
+                      variant="ghost"
+                      onClick={() => {
+                        setShowGraphicalModal(true);
+                        setActiveTab(2); // Switch to Graphical tab
+                      }}
+                      aria-label="Graphical View"
+                      colorScheme="purple"
+                    />
+                  </Tooltip>
+                )}
               </HStack>
             </Flex>
           </TabList>
 
           <TabPanels flex={1} overflow="auto">
+            {/* Console Tab */}
             <TabPanel p={4} h="100%">
               {logs.length === 0 ? (
                 <VStack spacing={4} justify="center" h="100%" opacity={0.5}>
@@ -902,6 +1074,7 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
               )}
             </TabPanel>
 
+            {/* Output Tab */}
             <TabPanel p={4}>
               <VStack align="stretch" spacing={4}>
                 {/* API Response Details */}
@@ -999,24 +1172,12 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
                 output={output}
                 language={language}
                 isLoading={isLoading}
-                executionData={{
-                  apiUsed: logs.find(log => log.message.includes('Executed using'))?.message.replace('✅ Executed using ', '').replace(' API', '') || 'unknown',
-                  executionTime: metrics.executionTime,
-                  success: compilerStatus === 'success',
-                  // Pass the actual execution result for better graphical detection
-                  rawOutput: output,
-                  hasGraphicalData: output && (
-                    output.includes('GRAPH_START') || 
-                    output.includes('MATPLOTLIB') ||
-                    output.includes('plt.') ||
-                    output.includes('plot(') ||
-                    output.includes('x_data') ||
-                    output.includes('y_data')
-                  )
-                }}
+                executionData={executionResult}
+                code={editorRef.current?.getValue() || ''}
               />
             </TabPanel>
 
+            {/* Problems Tab */}
             <TabPanel p={4}>
               <VStack align="stretch" spacing={2}>
                 {error ? (
@@ -1053,14 +1214,18 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
                     </VStack>
                   </HStack>
                 ) : (
-                  <Text color={colorMode === 'dark' ? 'gray.500' : 'gray.600'}>
-                    No problems detected in {language} code
-                  </Text>
+                  <VStack spacing={4} justify="center" h="200px" opacity={0.7}>
+                    <FaCheckCircle size={48} color={colorMode === 'dark' ? '#48bb78' : '#38a169'} />
+                    <Text fontSize="lg">No problems detected</Text>
+                    <Text fontSize="sm" color={colorMode === 'dark' ? 'gray.500' : 'gray.600'}>
+                      Your {language} code is ready to run
+                    </Text>
+                  </VStack>
                 )}
               </VStack>
             </TabPanel>
 
-            {/* Terminal TabPanel */}
+            {/* Terminal Tab */}
             <TabPanel p={0} h="100%">
               <Terminal
                 fileSystem={fileSystem}
@@ -1117,6 +1282,56 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
           </VStack>
         </MotionBox>
       )}
+
+      {/* Graphical Output Modal */}
+      <Modal 
+        isOpen={showGraphicalModal} 
+        onClose={() => setShowGraphicalModal(false)}
+        size="full"
+        isCentered
+      >
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(10px)" />
+        <ModalContent 
+          maxW="95vw" 
+          maxH="95vh" 
+          bg={colorMode === 'dark' ? 'gray.800' : 'white'}
+          borderRadius="xl"
+          overflow="hidden"
+        >
+          <ModalHeader 
+            bg={colorMode === 'dark' ? 'gray.900' : 'gray.50'}
+            borderBottom="1px solid"
+            borderColor={colorMode === 'dark' ? 'gray.700' : 'gray.200'}
+          >
+            <HStack justify="space-between">
+              <HStack spacing={3}>
+                <FaChartLine color={colorMode === 'dark' ? '#a78bfa' : '#7c3aed'} />
+                <Text>Graphical Output - {language.toUpperCase()}</Text>
+                <Badge colorScheme="purple">
+                  Interactive View
+                </Badge>
+              </HStack>
+              <HStack>
+                <IconButton
+                  icon={<FaCompress />}
+                  onClick={() => setShowGraphicalModal(false)}
+                  aria-label="Close"
+                  variant="ghost"
+                />
+              </HStack>
+            </HStack>
+          </ModalHeader>
+          <ModalBody p={0} overflow="hidden">
+            <GraphicalOutput 
+              output={output}
+              language={language}
+              isLoading={isLoading}
+              executionData={executionResult}
+              code={editorRef.current?.getValue() || ''}
+            />
+          </ModalBody>
+        </ModalContent>
+      </Modal>
 
       {/* Input Modal */}
       <InputModal
