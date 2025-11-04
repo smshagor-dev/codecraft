@@ -224,6 +224,7 @@ class RealTerminalService {
   async getDirectAuthStatus() {
     try {
       console.log('🔐 Checking authentication status with CORS workaround...');
+      const token = localStorage.getItem('auth_token');
       
       // Method 1: Try with credentials include (for same-domain scenarios)
       let response;
@@ -232,9 +233,12 @@ class RealTerminalService {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'X-Auth-Token': token
           },
           body: JSON.stringify({
-            action: 'profile'
+            action: 'verify',
+            token: token
           }),
           credentials: 'include'
         });
@@ -378,70 +382,101 @@ class RealTerminalService {
 
   // Cloud file operations via terminal commands - SIMPLIFIED VERSION
   async processCloudCommand(command, args) {
-    // For now, allow cloud commands without strict authentication
-    // This will work for public operations or when API handles auth internally
+    console.log('Processing cloud command:', command, 'Args:', args);
     
     try {
-      switch (command) {
-        case 'save':
-          return await this.saveToCloud();
-        
-        case 'load':
-          return await this.loadFromCloud();
-        
-        case 'ls':
-          return await this.listCloudFiles(args[0] || '');
-        
-        case 'mkdir':
-          if (!args[0]) {
-            return { output: 'Error: Directory name required', success: false };
-          }
-          return await this.createCloudDirectory(args[0], args[1] || '');
-        
-        case 'touch':
-          if (!args[0]) {
-            return { output: 'Error: Filename required', success: false };
-          }
-          return await this.createCloudFile(args[0], args[1] || '', args[2] || '');
-        
-        case 'rm':
-          if (!args[0]) {
-            return { output: 'Error: File path required', success: false };
-          }
-          return await this.deleteCloudFile(args[0]);
-        
-        case 'cat':
-          if (!args[0]) {
-            return { output: 'Error: File path required', success: false };
-          }
-          return await this.readCloudFile(args[0]);
-        
-        case 'stats':
-          return await this.getCloudStats();
-        
-        case 'upload':
-          if (!args[0]) {
-            return { output: 'Error: File path required', success: false };
-          }
-          return await this.uploadToCloud(args[0], args[1] || '');
-        
-        case 'download':
-          if (!args[0]) {
-            return { output: 'Error: File path required', success: false };
-          }
-          return await this.downloadFromCloud(args[0], args[1] || args[0]);
-        
-        case 'auth':
-          return await this.showAuthInfo();
-        
-        case 'test':
-          return await this.testAuth();
-        
-        default:
-          return null;
-      }
+        switch (command) {
+            case 'save':
+                return await this.saveToCloud();
+            
+            case 'load':
+                return await this.loadFromCloud();
+            
+            case 'ls':
+                let path = '';
+                if (args.length > 0 && args[0] !== 'ls') {
+                    path = args[0];
+                }
+                console.log('Listing cloud files with path:', path);
+                return await this.listCloudFiles(path);
+            
+            case 'mkdir':
+                if (!args[0]) {
+                    return { output: 'Error: Directory name required', success: false };
+                }
+                return await this.createCloudDirectory(args[0], args[1] || '');
+            
+            case 'touch':
+                if (!args[0]) {
+                    return { output: 'Error: Filename required', success: false };
+                }
+                const filename = args[0];
+                const content = args[1] || ''; 
+                const pathForFile = args[2] || ''; 
+                console.log('Creating file:', filename, 'Content length:', content.length, 'Path:', pathForFile);
+                return await this.createCloudFile(filename, content, pathForFile);
+            
+            case 'write':
+                if (!args[0]) {
+                    return { output: 'Error: File path required', success: false };
+                }
+                if (args.length < 2) {
+                    return { output: 'Error: Content required. Usage: cloud write <filepath> "<content>"', success: false };
+                }
+                const filepath = args[0];
+                const contentToWrite = args.slice(1).join(' '); 
+                console.log('Writing to file:', filepath, 'Content:', contentToWrite);
+                return await this.writeCloudFile(filepath, contentToWrite);
+            
+            case 'edit':
+                if (!args[0]) {
+                    return { output: 'Error: File path required', success: false };
+                }
+                const editFilepath = args[0];
+                const editContent = args.slice(1).join(' ') || '';
+                console.log('Editing file:', editFilepath, 'Content:', editContent);
+                return await this.writeCloudFile(editFilepath, editContent);
+            
+            case 'rm':
+                if (!args[0]) {
+                    return { output: 'Error: File path required', success: false };
+                }
+                return await this.deleteCloudFile(args[0]);
+            
+            case 'cat':
+                if (!args[0]) {
+                    return { output: 'Error: File path required', success: false };
+                }
+                return await this.readCloudFile(args[0]);
+            
+            case 'stats':
+                return await this.getCloudStats();
+            
+            case 'upload':
+                if (!args[0]) {
+                    return { output: 'Error: File path required', success: false };
+                }
+                return await this.uploadToCloud(args[0], args[1] || '');
+            
+            case 'download':
+                if (!args[0]) {
+                    return { output: 'Error: File path required', success: false };
+                }
+                return await this.downloadFromCloud(args[0], args[1] || args[0]);
+            
+            case 'auth':
+                return await this.showAuthInfo();
+            
+            case 'test':
+                return await this.testAuth();
+            
+            default:
+                console.log('Unknown cloud command:', command);
+                return { output: `Unknown cloud command: ${command}`, success: false };
+        }
     } catch (error) {
-      return { output: `Error: ${error.message}`, success: false };
+        console.error('Cloud command error:', error);
+        return { output: `Error: ${error.message}`, success: false };
     }
   }
 
@@ -500,19 +535,41 @@ class RealTerminalService {
     };
   }
 
-  async saveToCloud() {
-    return { 
-      output: 'Save to cloud: This would save your current project to cloud storage.\nUse "cloud upload <file>" for individual files.',
-      success: true 
-    };
+  async saveToCloud(content = '', filepath = '') {
+    try {
+      const token = localStorage.getItem('auth_token');
+  
+      if (content && filepath) {
+        return await this.writeCloudFile(filepath, content);
+      }
+  
+      // General info if no args
+      return {
+        output: 'Save to cloud: This would save your current project to cloud storage.\n' +
+                'Use "cloud upload <file>" for individual files.\n\n' +
+                'Other options:\n' +
+                '1. Create new file: cloud touch filename.txt "content"\n' +
+                '2. Write to existing file: cloud write filename.txt "new content"\n' +
+                '3. Edit file: cloud edit filename.txt "updated content"\n' +
+                '4. Save current project: Use the "Save Project" button in Quick Actions',
+        success: true
+      };
+    } catch (error) {
+      console.error('Save error:', error);
+      return { output: `Error: ${error.message}`, success: false };
+    }
   }
+  
 
   async loadFromCloud() {
     try {
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(this.filesApiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-Auth-Token': token
         },
         body: JSON.stringify({
           action: 'list',
@@ -549,16 +606,21 @@ class RealTerminalService {
 
   async listCloudFiles(path = '') {
     try {
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(this.filesApiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-Auth-Token': token
         },
         body: JSON.stringify({
           action: 'list',
-          path: path
+          path: path, token: token
         })
       });
+
+      console.log('Listing cloud files at path:', path, token);
 
       const responseText = await response.text();
       const cleanResponse = cleanApiResponse(responseText);
@@ -593,10 +655,13 @@ class RealTerminalService {
 
   async createCloudDirectory(dirname, path = '') {
     try {
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(this.filesApiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-Auth-Token': token
         },
         body: JSON.stringify({
           action: 'mkdir',
@@ -620,38 +685,94 @@ class RealTerminalService {
 
   async createCloudFile(filename, content = '', path = '') {
     try {
-      const response = await fetch(this.filesApiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'create',
-          filename: filename,
-          content: content,
-          path: path
-        })
-      });
+        const token = localStorage.getItem('auth_token');
+        console.log('Creating cloud file:', { filename, content: content.substring(0, 50) + '...', path, token: token ? 'Present' : 'Missing' });
+        
+        const response = await fetch(this.filesApiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'X-Auth-Token': token
+            },
+            body: JSON.stringify({
+                action: 'create',
+                filename: filename,
+                content: content,
+                path: path
+            })
+        });
 
-      const responseText = await response.text();
-      const cleanResponse = cleanApiResponse(responseText);
-      const data = JSON.parse(cleanResponse);
+        console.log('Create file response status:', response.status);
 
-      return { 
-        output: data.success ? `✅ File '${filename}' created successfully` : `❌ Error: ${data.error}`,
-        success: data.success
-      };
+        const responseText = await response.text();
+        console.log('Raw create response:', responseText);
+        
+        const cleanResponse = cleanApiResponse(responseText);
+        const data = JSON.parse(cleanResponse);
+
+        console.log('Parsed create response:', data);
+
+        return { 
+            output: data.success ? `✅ File '${filename}' created successfully` : `❌ Error: ${data.error}`,
+            success: data.success
+        };
     } catch (error) {
-      return { output: `Error: ${error.message}`, success: false };
+        console.error('Create file error:', error);
+        return { output: `Error: ${error.message}`, success: false };
     }
   }
 
+  async writeCloudFile(filepath, content) {
+    try {
+        const token = localStorage.getItem('auth_token');
+        console.log('Writing to cloud file:', { filepath, content: content.substring(0, 50) + '...', token: token ? 'Present' : 'Missing' });
+        
+        const response = await fetch(this.filesApiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'X-Auth-Token': token
+            },
+            body: JSON.stringify({
+                action: 'write',
+                filepath: filepath,
+                content: content
+            })
+        });
+
+        console.log('Write file response status:', response.status);
+
+        const responseText = await response.text();
+        console.log('Raw write response:', responseText);
+        
+        const cleanResponse = cleanApiResponse(responseText);
+        const data = JSON.parse(cleanResponse);
+
+        console.log('Parsed write response:', data);
+
+        return { 
+            output: data.success ? `✅ File '${filepath}' updated successfully` : `❌ Error: ${data.error}`,
+            success: data.success
+        };
+    } catch (error) {
+        console.error('Write file error:', error);
+        return { output: `Error: ${error.message}`, success: false };
+    }
+  }
+
+  
+
   async deleteCloudFile(filepath) {
     try {
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(this.filesApiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-Auth-Token': token
         },
         body: JSON.stringify({
           action: 'delete',
@@ -674,10 +795,13 @@ class RealTerminalService {
 
   async readCloudFile(filepath) {
     try {
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(this.filesApiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-Auth-Token': token
         },
         body: JSON.stringify({
           action: 'read',
@@ -714,10 +838,13 @@ class RealTerminalService {
 
   async getCloudStats() {
     try {
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(this.filesApiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-Auth-Token': token
         },
         body: JSON.stringify({
           action: 'stats'
@@ -778,8 +905,16 @@ class RealTerminalService {
     // Check for cloud commands first
     if (lowerCommand.startsWith('cloud ')) {
       const cloudCommand = lowerCommand.replace('cloud ', '');
-      return await this.processCloudCommand(cloudCommand, args);
-    }
+      const cloudArgs = cloudCommand.split(' ').slice(1);
+      const cloudAction = cloudCommand.split(' ')[0];
+      
+      console.log('Cloud command detected - Action:', cloudAction, 'Args:', cloudArgs);
+      
+      const result = await this.processCloudCommand(cloudAction, cloudArgs);
+      if (result !== null) {
+          return result;
+      }
+  }
 
     if (lowerCommand === 'help' || lowerCommand === '--help') {
       return { output: this.getHelpText(), success: true };
@@ -1372,7 +1507,7 @@ Please check your API endpoint and try again.`,
         <HStack spacing={3}>
           <FaTerminal />
           <Text fontSize="sm" fontWeight="bold">
-            Real Cloud Terminal
+            Cloud Terminal
           </Text>
           <Badge colorScheme={isConnected ? "green" : "red"} fontSize="xs">
             {isConnected ? "Connected" : "Disconnected"}
@@ -1421,7 +1556,7 @@ Please check your API endpoint and try again.`,
                 bg="gray.800"
                 _hover={{ bg: "gray.700" }}
               >
-                Test Auth
+                Check Auth
               </MenuItem>
               <MenuItem 
                 icon={<FaSave />}
@@ -1647,16 +1782,7 @@ Please check your API endpoint and try again.`,
               onClick={handleAuthTest}
               leftIcon={<FaUser />}
             >
-              Test Auth
-            </Button>
-            <Button
-              size="xs"
-              colorScheme="red"
-              variant="outline"
-              onClick={checkManualAuth}
-              leftIcon={<FaExclamationTriangle />}
-            >
-              Debug Auth
+              check Auth Stsatus
             </Button>
           </HStack>
         </Box>

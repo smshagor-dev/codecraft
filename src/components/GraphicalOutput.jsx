@@ -28,7 +28,15 @@ import {
   ModalBody,
   ModalFooter,
   useDisclosure,
-  ButtonGroup  // ADD THIS IMPORT
+  ButtonGroup,
+  Select,
+  NumberInput,
+  NumberInputField,
+  NumberInputStepper,
+  NumberIncrementStepper,
+  NumberDecrementStepper,
+  FormControl,
+  FormLabel
 } from "@chakra-ui/react";
 import { 
   FaDownload, 
@@ -43,19 +51,280 @@ import {
   FaTimes,
   FaChartBar,
   FaChartArea,
-  FaWaveSquare
+  FaWaveSquare,
+  FaTable,
+  FaDatabase,
+  FaFilter
 } from "react-icons/fa";
 import { useState, useRef, useEffect } from "react";
 
+// Enhanced Data Parser Class
+class RealisticDataParser {
+  static parseNumericalData(output) {
+    if (!output) return [];
+    
+    const lines = output.split('\n');
+    const numericalData = [];
+    
+    // Try different parsing strategies
+    lines.forEach(line => {
+      line = line.trim();
+      
+      // Skip empty lines and common non-data lines
+      if (!line || 
+          line.includes('>>>') || 
+          line.includes('...') ||
+          line.startsWith('#') ||
+          line.startsWith('//') ||
+          line.length > 200) {
+        return;
+      }
+      
+      // Strategy 1: Array-like patterns [1, 2, 3, 4]
+      const arrayMatch = line.match(/\[([\d\s\.,\-]+)\]/);
+      if (arrayMatch) {
+        const numbers = arrayMatch[1].split(/[,\s]+/).filter(n => n.trim());
+        numbers.forEach(num => {
+          const parsed = parseFloat(num);
+          if (!isNaN(parsed)) numericalData.push(parsed);
+        });
+        return;
+      }
+      
+      // Strategy 2: CSV-like data 1,2,3,4 or 1 2 3 4
+      const csvNumbers = line.split(/[,\s]+/).slice(0, 10); // Limit to prevent overflow
+      let validNumbers = 0;
+      csvNumbers.forEach(num => {
+        const parsed = parseFloat(num);
+        if (!isNaN(parsed) && Math.abs(parsed) < 1000000) { // Reasonable range
+          numericalData.push(parsed);
+          validNumbers++;
+        }
+      });
+      
+      // Strategy 3: Key-value pairs x=1, y=2
+      const keyValueMatches = line.match(/(\w+)\s*[=:]\s*([\d\.\-]+)/g);
+      if (keyValueMatches) {
+        keyValueMatches.forEach(kv => {
+          const match = kv.match(/(\w+)\s*[=:]\s*([\d\.\-]+)/);
+          if (match) {
+            const parsed = parseFloat(match[2]);
+            if (!isNaN(parsed)) numericalData.push(parsed);
+          }
+        });
+      }
+      
+      // Strategy 4: Table data with | separators
+      if (line.includes('|')) {
+        const tableCells = line.split('|').filter(cell => cell.trim());
+        tableCells.forEach(cell => {
+          const parsed = parseFloat(cell.trim());
+          if (!isNaN(parsed)) numericalData.push(parsed);
+        });
+      }
+    });
+    
+    return numericalData;
+  }
+
+  static detectDataStructure(output) {
+    const lines = output.split('\n').slice(0, 50); // Analyze first 50 lines
+    let structure = {
+      type: 'unknown',
+      hasHeaders: false,
+      dataPoints: 0,
+      dimensions: 1,
+      sampleRate: 1,
+      isTimeSeries: false,
+      isCategorical: false
+    };
+    
+    const numericalData = this.parseNumericalData(output);
+    structure.dataPoints = numericalData.length;
+    
+    // Analyze line patterns
+    let arrayLines = 0;
+    let tableLines = 0;
+    let keyValueLines = 0;
+    
+    lines.forEach(line => {
+      if (line.includes('[') && line.includes(']')) arrayLines++;
+      if (line.includes('|')) tableLines++;
+      if (line.match(/\w+\s*[=:]\s*[\d\.]/)) keyValueLines++;
+      if (line.match(/\d{4}[-/]\d{2}[-/]\d{2}/)) structure.isTimeSeries = true;
+      if (line.match(/[a-zA-Z_][a-zA-Z0-9_]*\s*:/)) structure.hasHeaders = true;
+    });
+    
+    // Determine structure type
+    if (arrayLines > 2) {
+      structure.type = 'array';
+      structure.dimensions = arrayLines > 5 ? 2 : 1;
+    } else if (tableLines > 2) {
+      structure.type = 'table';
+      structure.dimensions = 2;
+    } else if (keyValueLines > 2) {
+      structure.type = 'key_value';
+      structure.dimensions = 2;
+    } else if (numericalData.length > 10) {
+      structure.type = 'numerical_sequence';
+      structure.dimensions = 1;
+    }
+    
+    // Check for categorical data
+    const textLines = lines.filter(line => 
+      line.match(/[a-zA-Z]{3,}/) && 
+      !line.match(/error|warning|info|debug/) &&
+      line.length < 100
+    ).length;
+    
+    if (textLines > numericalData.length / 2) {
+      structure.isCategorical = true;
+    }
+    
+    return structure;
+  }
+
+  static generateRealisticDataset(output, chartType, dataPoints = 20) {
+    const numericalData = this.parseNumericalData(output);
+    const structure = this.detectDataStructure(output);
+    
+    // If we have enough real data, use it
+    if (numericalData.length >= 5) {
+      return this.generateFromRealData(numericalData, chartType, structure);
+    }
+    
+    // Otherwise generate realistic synthetic data based on chart type
+    return this.generateSyntheticData(chartType, dataPoints, structure);
+  }
+
+  static generateFromRealData(data, chartType, structure) {
+    const limitedData = data.slice(0, 50); // Limit data points
+    
+    switch (chartType) {
+      case 'line':
+        return limitedData.map((value, index) => ({
+          x: index,
+          y: value,
+          label: `Point ${index + 1}`
+        }));
+        
+      case 'bar':
+        return limitedData.slice(0, 15).map((value, index) => ({
+          x: `Item ${index + 1}`,
+          y: Math.abs(value),
+          label: `Value ${index + 1}`
+        }));
+        
+      case 'scatter':
+        // Create x,y pairs from sequential data
+        const pairs = [];
+        for (let i = 0; i < limitedData.length - 1; i += 2) {
+          pairs.push({
+            x: limitedData[i],
+            y: limitedData[i + 1] || limitedData[i] * 0.5,
+            label: `(${limitedData[i]}, ${limitedData[i + 1] || limitedData[i] * 0.5})`
+          });
+        }
+        return pairs.slice(0, 20);
+        
+      case 'area':
+        return limitedData.map((value, index) => ({
+          x: index,
+          y: Math.abs(value) + 10, // Ensure positive for area charts
+          label: `Area ${index + 1}`
+        }));
+        
+      default:
+        return limitedData.map((value, index) => ({
+          x: index,
+          y: value,
+          label: `Point ${index + 1}`
+        }));
+    }
+  }
+
+  static generateSyntheticData(chartType, dataPoints, structure) {
+    const data = [];
+    
+    switch (chartType) {
+      case 'line':
+        // Realistic time series data
+        for (let i = 0; i < dataPoints; i++) {
+          const trend = i * 0.8;
+          const seasonal = Math.sin(i * 0.5) * 15;
+          const noise = (Math.random() - 0.5) * 8;
+          data.push({
+            x: i,
+            y: trend + seasonal + noise + 20,
+            label: `Time ${i + 1}`
+          });
+        }
+        break;
+        
+      case 'bar':
+        // Realistic categorical data
+        const categories = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        for (let i = 0; i < Math.min(dataPoints, categories.length); i++) {
+          data.push({
+            x: categories[i],
+            y: Math.floor(Math.random() * 100) + 20,
+            label: categories[i]
+          });
+        }
+        break;
+        
+      case 'scatter':
+        // Realistic correlation data
+        for (let i = 0; i < dataPoints; i++) {
+          const base = i * 2;
+          const x = base + (Math.random() - 0.5) * 10;
+          const y = base * 0.8 + (Math.random() - 0.5) * 15 + 10;
+          data.push({
+            x: x,
+            y: y,
+            label: `(${x.toFixed(1)}, ${y.toFixed(1)})`
+          });
+        }
+        break;
+        
+      case 'area':
+        // Realistic stacked area data
+        let cumulative = 0;
+        for (let i = 0; i < dataPoints; i++) {
+          const value = Math.sin(i * 0.3) * 20 + Math.cos(i * 0.2) * 10 + 30;
+          cumulative += value;
+          data.push({
+            x: i,
+            y: cumulative,
+            label: `Cumulative ${i + 1}`
+          });
+        }
+        break;
+        
+      default:
+        for (let i = 0; i < dataPoints; i++) {
+          data.push({
+            x: i,
+            y: Math.sin(i * 0.3) * 25 + Math.random() * 10 + 25,
+            label: `Point ${i + 1}`
+          });
+        }
+    }
+    
+    return data;
+  }
+}
+
 // Enhanced Visualization Detector Class
-class EnhancedVisualizationDetector {
+class RealisticVisualizationDetector {
   static detectVisualizationCapability(output, language, code = '') {
     if (!output || output.trim().length === 0) {
       return {
         hasVisualization: false,
         confidence: 0,
         type: 'none',
-        reason: 'No output data'
+        reason: 'No output data',
+        dataStructure: {}
       };
     }
 
@@ -66,63 +335,80 @@ class EnhancedVisualizationDetector {
       reasons: [],
       dataPoints: 0,
       patterns: [],
-      suggestedChart: 'line'
+      suggestedChart: 'line',
+      dataStructure: {},
+      dataQuality: 'low'
     };
+
+    // Parse and analyze the actual data
+    const numericalData = RealisticDataParser.parseNumericalData(output);
+    analysis.dataStructure = RealisticDataParser.detectDataStructure(output);
+    analysis.dataPoints = numericalData.length;
+
+    // Data quality assessment
+    if (numericalData.length >= 20) {
+      analysis.dataQuality = 'high';
+    } else if (numericalData.length >= 5) {
+      analysis.dataQuality = 'medium';
+    }
 
     // Convert to lowercase for case-insensitive matching
     const outputLower = output.toLowerCase();
     const codeLower = code.toLowerCase();
 
-    // Data pattern detection
+    // Enhanced data pattern detection with weights
     const dataPatterns = [
       // Array patterns
-      { pattern: /\[[\d\s\.,]+\]/g, weight: 8, type: 'numerical_array' },
+      { pattern: /\[[\d\s\.,\-]+\]/g, weight: 8, type: 'numerical_array' },
+      { pattern: /array\s*\([^)]*\)/g, weight: 7, type: 'array_function' },
+      { pattern: /list\s*\([^)]*\)/g, weight: 7, type: 'list_function' },
+      
+      // Data assignment patterns
       { pattern: /x\s*[:=]\s*\[/, weight: 9, type: 'x_data' },
       { pattern: /y\s*[:=]\s*\[/, weight: 9, type: 'y_data' },
       { pattern: /values?\s*[:=]\s*\[/, weight: 7, type: 'values_data' },
       { pattern: /data\s*[:=]\s*\[/, weight: 7, type: 'data_array' },
       
-      // CSV-like data
-      { pattern: /\d+\.?\d*\s*,\s*\d+\.?\d*/g, weight: 6, type: 'csv_data' },
+      // CSV-like data with realistic patterns
+      { pattern: /\d+\.?\d*\s*,\s*\d+\.?\d*/g, weight: 6, type: 'coordinate_data' },
       { pattern: /\d+\s+\d+/g, weight: 5, type: 'space_separated_data' },
+      { pattern: /\d+\.\d+/g, weight: 4, type: 'float_data' },
       
       // Table data
       { pattern: /\|\s*\d+\.?\d*\s*\|/g, weight: 5, type: 'table_data' },
+      { pattern: /\+[-]+\+/g, weight: 4, type: 'table_border' },
       
       // JSON data
-      { pattern: /\{"x":\s*\d+/, weight: 8, type: 'json_coordinates' },
-      { pattern: /"values":\s*\[/, weight: 7, type: 'json_values' }
+      { pattern: /\{"x":\s*[\d\.\-]+/g, weight: 8, type: 'json_coordinates' },
+      { pattern: /"y":\s*[\d\.\-]+/g, weight: 8, type: 'json_coordinates' },
+      { pattern: /"values":\s*\[/g, weight: 7, type: 'json_values' },
+      { pattern: /"data":\s*\[/g, weight: 7, type: 'json_data' }
     ];
 
-    // Visualization keywords in code
+    // Visualization keywords in code with context
     const visualizationKeywords = [
-      { pattern: /\bplot\b/, weight: 6, type: 'plot_function' },
+      { pattern: /\bplot\s*\(/, weight: 8, type: 'plot_function' },
+      { pattern: /\bplt\.plot\b/, weight: 9, type: 'matplotlib_plot' },
       { pattern: /\bgraph\b/, weight: 6, type: 'graph_function' },
       { pattern: /\bchart\b/, weight: 6, type: 'chart_function' },
       { pattern: /\bvisualize\b/, weight: 7, type: 'visualize_function' },
       { pattern: /\bdraw\b/, weight: 5, type: 'draw_function' },
-      { pattern: /\bshow\b/, weight: 5, type: 'show_function' },
+      { pattern: /\bshow\s*\(/, weight: 6, type: 'show_function' },
       { pattern: /\bdisplay\b/, weight: 5, type: 'display_function' },
-      { pattern: /\bfigure\b/, weight: 5, type: 'figure_function' }
+      { pattern: /\bfigure\b/, weight: 5, type: 'figure_function' },
+      { pattern: /\bsubplot\b/, weight: 6, type: 'subplot_function' }
     ];
 
-    // Library detection
+    // Library detection with version patterns
     const libraryPatterns = [
       { pattern: /matplotlib|plt\./, weight: 9, type: 'matplotlib' },
       { pattern: /seaborn|sns\./, weight: 8, type: 'seaborn' },
       { pattern: /plotly/, weight: 8, type: 'plotly' },
       { pattern: /ggplot/, weight: 7, type: 'ggplot' },
       { pattern: /d3\./, weight: 8, type: 'd3' },
-      { pattern: /chart\.js/, weight: 7, type: 'chartjs' }
-    ];
-
-    // Mathematical patterns
-    const mathPatterns = [
-      { pattern: /\bsin\b|\bcos\b|\btan\b/, weight: 4, type: 'trig_function' },
-      { pattern: /\blog\b|\bexp\b/, weight: 4, type: 'math_function' },
-      { pattern: /\bmath\./, weight: 4, type: 'math_library' },
-      { pattern: /\bnumpy\b|\bnp\./, weight: 5, type: 'numpy' },
-      { pattern: /\bpandas\b|\bpd\./, weight: 5, type: 'pandas' }
+      { pattern: /chart\.js/, weight: 7, type: 'chartjs' },
+      { pattern: /pandas|pd\./, weight: 6, type: 'pandas' },
+      { pattern: /numpy|np\./, weight: 5, type: 'numpy' }
     ];
 
     // Analyze output for data patterns
@@ -130,7 +416,7 @@ class EnhancedVisualizationDetector {
     dataPatterns.forEach(({ pattern, weight, type }) => {
       const matches = output.match(pattern);
       if (matches && matches.length > 0) {
-        totalWeight += weight * matches.length;
+        totalWeight += weight * Math.min(matches.length, 5); // Cap matches
         analysis.patterns.push({ type, matches: matches.length, sample: matches[0] });
         analysis.reasons.push(`Found ${matches.length} ${type} patterns`);
       }
@@ -154,93 +440,65 @@ class EnhancedVisualizationDetector {
       }
     });
 
-    // Count numerical data points
-    const numberMatches = output.match(/\d+\.?\d*/g);
-    if (numberMatches) {
-      analysis.dataPoints = numberMatches.length;
-      if (analysis.dataPoints >= 5) {
-        totalWeight += Math.min(10, analysis.dataPoints / 5);
-        analysis.reasons.push(`Found ${analysis.dataPoints} numerical values`);
-      }
+    // Real data points boost
+    if (analysis.dataPoints > 0) {
+      const dataBoost = Math.min(20, analysis.dataPoints * 0.5);
+      totalWeight += dataBoost;
+      analysis.reasons.push(`Found ${analysis.dataPoints} numerical values`);
     }
 
-    // Language-specific boosts
+    // Data structure boosts
+    if (analysis.dataStructure.dimensions === 2) {
+      totalWeight += 10;
+      analysis.reasons.push('2D data structure detected');
+    }
+    if (analysis.dataStructure.isTimeSeries) {
+      totalWeight += 8;
+      analysis.reasons.push('Time series data detected');
+    }
+
+    // Language-specific context
     const languageBoosts = {
-      'python': 5,
-      'r': 5,
-      'javascript': 3,
-      'matlab': 4
+      'python': 8,
+      'r': 8,
+      'julia': 7,
+      'matlab': 7,
+      'javascript': 4,
+      'java': 3
     };
     
     totalWeight += languageBoosts[language] || 0;
 
-    // Determine visualization type
-    if (totalWeight >= 10) {
+    // Determine visualization capability
+    if (totalWeight >= 15 || analysis.dataPoints >= 10) {
       analysis.hasVisualization = true;
-      analysis.confidence = Math.min(100, totalWeight * 3);
+      analysis.confidence = Math.min(95, totalWeight * 2 + analysis.dataPoints);
       
-      // Determine best visualization type
-      if (analysis.patterns.some(p => p.type.includes('json') || p.type.includes('coordinates'))) {
-        analysis.type = 'interactive_chart';
-        analysis.suggestedChart = 'scatter';
-      } else if (analysis.patterns.some(p => p.type.includes('array') || p.type.includes('data'))) {
-        analysis.type = 'line_chart';
+      // Smart chart type suggestion based on data analysis
+      if (analysis.dataStructure.isTimeSeries) {
+        analysis.type = 'time_series';
         analysis.suggestedChart = 'line';
-      } else if (analysis.dataPoints > 20) {
-        analysis.type = 'scatter_plot';
+      } else if (analysis.dataStructure.dimensions === 2) {
+        analysis.type = 'correlation_analysis';
         analysis.suggestedChart = 'scatter';
-      } else if (analysis.dataPoints <= 10) {
-        analysis.type = 'bar_chart';
+      } else if (analysis.dataStructure.isCategorical) {
+        analysis.type = 'categorical_analysis';
         analysis.suggestedChart = 'bar';
-      } else {
-        analysis.type = 'area_chart';
+      } else if (analysis.dataPoints > 30) {
+        analysis.type = 'large_dataset';
         analysis.suggestedChart = 'area';
+      } else {
+        analysis.type = 'general_visualization';
+        analysis.suggestedChart = 'line';
       }
     } else {
       analysis.hasVisualization = false;
-      analysis.confidence = Math.min(100, totalWeight * 2);
+      analysis.confidence = Math.min(50, totalWeight * 2);
+      analysis.type = 'insufficient_data';
     }
 
-    console.log('Visualization Analysis:', analysis);
+    console.log('Enhanced Visualization Analysis:', analysis);
     return analysis;
-  }
-
-  static generateSampleData(output, chartType = 'line') {
-    // Parse numerical data from output
-    const numbers = output.match(/\d+\.?\d*/g);
-    
-    if (!numbers || numbers.length < 3) {
-      // Generate sample data based on chart type
-      const dataPoints = 20;
-      switch (chartType) {
-        case 'bar':
-          return Array.from({ length: dataPoints }, (_, i) => ({
-            x: `Point ${i + 1}`,
-            y: Math.floor(Math.random() * 100) + 10
-          }));
-        case 'scatter':
-          return Array.from({ length: dataPoints }, (_, i) => ({
-            x: i + Math.random() * 2,
-            y: Math.sin(i * 0.5) * 30 + Math.random() * 20 + 30
-          }));
-        case 'area':
-          return Array.from({ length: dataPoints }, (_, i) => ({
-            x: i,
-            y: Math.sin(i * 0.3) * 20 + Math.cos(i * 0.2) * 10 + 40
-          }));
-        default: // line
-          return Array.from({ length: dataPoints }, (_, i) => ({
-            x: i,
-            y: Math.sin(i * 0.3) * 25 + Math.random() * 10 + 25
-          }));
-      }
-    }
-
-    // Use actual numbers from output
-    return numbers.slice(0, 20).map((num, i) => ({
-      x: chartType === 'bar' ? `Value ${i + 1}` : i,
-      y: parseFloat(num) || Math.random() * 50 + 10
-    }));
   }
 }
 
@@ -255,8 +513,9 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
   const [visualizationAnalysis, setVisualizationAnalysis] = useState(null);
   const [userDismissedPopup, setUserDismissedPopup] = useState(false);
   const [isGeneratingGraph, setIsGeneratingGraph] = useState(false);
-  const [graphQuality, setGraphQuality] = useState(2);
   const [currentChartType, setCurrentChartType] = useState('line');
+  const [dataPoints, setDataPoints] = useState(20);
+  const [showRawData, setShowRawData] = useState(false);
   
   const imageRef = useRef(null);
   const canvasRef = useRef(null);
@@ -264,12 +523,13 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
   // Analyze output for visualization capability
   useEffect(() => {
     if (output && output.trim().length > 0 && !userDismissedPopup) {
-      const analysis = EnhancedVisualizationDetector.detectVisualizationCapability(output, language, code);
+      const analysis = RealisticVisualizationDetector.detectVisualizationCapability(output, language, code);
       setVisualizationAnalysis(analysis);
       
       // Set initial chart type based on analysis
       if (analysis.hasVisualization) {
         setCurrentChartType(analysis.suggestedChart);
+        setDataPoints(Math.min(50, Math.max(10, analysis.dataPoints || 20)));
       }
       
       // Show popup if visualization is possible with good confidence
@@ -282,7 +542,7 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
       // Auto-generate graph if we have visualization capability
       if (analysis.hasVisualization && canvasRef.current) {
         setTimeout(() => {
-          generateEnhancedGraph(analysis);
+          generateRealisticGraph(analysis);
         }, 500);
       }
     }
@@ -292,7 +552,7 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
   const handleViewVisualization = () => {
     setShowVisualizationPopup(false);
     if (visualizationAnalysis?.hasVisualization) {
-      generateEnhancedGraph(visualizationAnalysis);
+      generateRealisticGraph(visualizationAnalysis);
     }
   };
 
@@ -305,8 +565,8 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
     setShowVisualizationPopup(false);
   };
 
-  // Generate enhanced graph
-  const generateEnhancedGraph = (analysis) => {
+  // Generate realistic graph
+  const generateRealisticGraph = (analysis) => {
     if (!canvasRef.current) return;
     
     setIsGeneratingGraph(true);
@@ -320,24 +580,25 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
         // Clear canvas
         ctx.clearRect(0, 0, width, height);
         
-        // Generate or parse data
-        const data = EnhancedVisualizationDetector.generateSampleData(output, currentChartType);
+        // Generate realistic dataset
+        const data = RealisticDataParser.generateRealisticDataset(output, currentChartType, dataPoints);
         
-        console.log('🎨 Generating graph with:', {
+        console.log('🎨 Generating realistic graph with:', {
           dataPoints: data.length,
           chartType: currentChartType,
-          analysis: analysis.type
+          dataStructure: analysis.dataStructure,
+          dataQuality: analysis.dataQuality
         });
 
-        // Background with nice gradient
+        // Professional background
         const gradient = ctx.createLinearGradient(0, 0, width, height);
-        gradient.addColorStop(0, colorMode === 'dark' ? '#1a202c' : '#f7fafc');
-        gradient.addColorStop(1, colorMode === 'dark' ? '#2d3748' : '#edf2f7');
+        gradient.addColorStop(0, colorMode === 'dark' ? '#1a202c' : '#f8fafc');
+        gradient.addColorStop(1, colorMode === 'dark' ? '#2d3748' : '#f1f5f9');
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, width, height);
         
-        // Chart area
-        const margin = { top: 60, right: 40, bottom: 60, left: 60 };
+        // Chart area with professional styling
+        const margin = { top: 70, right: 50, bottom: 70, left: 70 };
         const chartWidth = width - margin.left - margin.right;
         const chartHeight = height - margin.top - margin.bottom;
         
@@ -345,16 +606,16 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
         ctx.fillStyle = colorMode === 'dark' ? '#2d3748' : '#ffffff';
         ctx.fillRect(margin.left, margin.top, chartWidth, chartHeight);
         ctx.strokeStyle = colorMode === 'dark' ? '#4a5568' : '#e2e8f0';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1;
         ctx.strokeRect(margin.left, margin.top, chartWidth, chartHeight);
         
-        // Draw grid
-        ctx.strokeStyle = colorMode === 'dark' ? '#2d3748' : '#f1f5f9';
-        ctx.lineWidth = 1;
+        // Professional grid
+        ctx.strokeStyle = colorMode === 'dark' ? '#374151' : '#f1f5f9';
+        ctx.lineWidth = 0.5;
         
-        for (let i = 0; i <= 8; i++) {
-          const x = margin.left + (i / 8) * chartWidth;
-          const y = margin.top + (i / 8) * chartHeight;
+        for (let i = 0; i <= 10; i++) {
+          const x = margin.left + (i / 10) * chartWidth;
+          const y = margin.top + (i / 10) * chartHeight;
           
           // Vertical grid lines
           ctx.beginPath();
@@ -373,37 +634,43 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
         const xValues = data.map(d => typeof d.x === 'string' ? data.indexOf(d) : d.x);
         const yValues = data.map(d => d.y);
         
+        const xMin = Math.min(...xValues);
+        const xMax = Math.max(...xValues);
+        const yMin = Math.min(...yValues);
+        const yMax = Math.max(...yValues);
+        
         const scaleX = (value) => {
           if (currentChartType === 'bar') {
             const index = typeof value === 'string' ? data.findIndex(d => d.x === value) : value;
-            return margin.left + (index / data.length) * chartWidth + (chartWidth / data.length) * 0.1;
+            const barWidth = chartWidth / data.length;
+            return margin.left + index * barWidth + barWidth * 0.1;
           }
-          return margin.left + (value / Math.max(...xValues)) * chartWidth;
+          return margin.left + ((value - xMin) / (xMax - xMin)) * chartWidth;
         };
         
         const scaleY = (value) => {
-          return margin.top + chartHeight - ((value - Math.min(...yValues)) / (Math.max(...yValues) - Math.min(...yValues))) * chartHeight;
+          return margin.top + chartHeight - ((value - yMin) / (yMax - yMin)) * chartHeight;
         };
         
         // Draw chart based on type
         switch (currentChartType) {
           case 'bar':
-            drawBarChart(ctx, data, scaleX, scaleY, chartWidth, data.length, margin, colorMode);
+            drawProfessionalBarChart(ctx, data, scaleX, scaleY, chartWidth, data.length, margin, colorMode);
             break;
           case 'scatter':
-            drawScatterChart(ctx, data, scaleX, scaleY, colorMode);
+            drawProfessionalScatterChart(ctx, data, scaleX, scaleY, colorMode);
             break;
           case 'area':
-            drawAreaChart(ctx, data, scaleX, scaleY, chartHeight, margin, colorMode);
+            drawProfessionalAreaChart(ctx, data, scaleX, scaleY, chartHeight, margin, colorMode);
             break;
           default: // line
-            drawLineChart(ctx, data, scaleX, scaleY, colorMode);
+            drawProfessionalLineChart(ctx, data, scaleX, scaleY, colorMode);
             break;
         }
         
-        // Draw axes
+        // Professional axes
         ctx.strokeStyle = colorMode === 'dark' ? '#cbd5e0' : '#4a5568';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         
         // X-axis
         ctx.beginPath();
@@ -417,47 +684,58 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
         ctx.lineTo(margin.left, margin.top + chartHeight);
         ctx.stroke();
         
-        // Labels and title
+        // Professional labels and title
         ctx.fillStyle = colorMode === 'dark' ? '#e2e8f0' : '#2d3748';
-        ctx.font = 'bold 14px Arial';
+        ctx.font = 'bold 16px "Segoe UI", Arial, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        ctx.fillText(`${language.toUpperCase()} Data Visualization - ${currentChartType.toUpperCase()} Chart`, width / 2, 15);
+        ctx.fillText(`${language.toUpperCase()} Data Analysis - ${currentChartType.toUpperCase()} Chart`, width / 2, 20);
         
-        ctx.font = '12px Arial';
-        ctx.fillText('X Axis', margin.left + chartWidth / 2, margin.top + chartHeight + 20);
+        ctx.font = '12px "Segoe UI", Arial, sans-serif';
+        ctx.fillText('X Axis', margin.left + chartWidth / 2, margin.top + chartHeight + 25);
         
         ctx.save();
-        ctx.translate(margin.left - 30, margin.top + chartHeight / 2);
+        ctx.translate(margin.left - 35, margin.top + chartHeight / 2);
         ctx.rotate(-Math.PI / 2);
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('Y Axis', 0, 0);
         ctx.restore();
         
-        // Data info
-        ctx.font = '10px Arial';
+        // Data quality info
+        ctx.font = '11px "Segoe UI", Arial, sans-serif';
         ctx.fillStyle = colorMode === 'dark' ? '#a0aec0' : '#718096';
         ctx.textAlign = 'left';
-        ctx.fillText(`Data points: ${data.length} | Chart: ${currentChartType} | Confidence: ${analysis.confidence}%`, margin.left, margin.top - 25);
         
-        console.log('✅ Graph generated successfully');
+        const infoText = [
+          `Data points: ${data.length}`,
+          `Chart type: ${currentChartType}`,
+          `Confidence: ${analysis.confidence}%`,
+          `Quality: ${analysis.dataQuality}`
+        ].join(' | ');
+        
+        ctx.fillText(infoText, margin.left, margin.top - 30);
+        
+        console.log('✅ Realistic graph generated successfully');
         
       } catch (error) {
         console.error('❌ Error generating graph:', error);
-        generateFallbackGraph();
+        generateProfessionalFallbackGraph();
       } finally {
         setIsGeneratingGraph(false);
       }
     }, 50);
   };
 
-  // Chart drawing functions
-  const drawLineChart = (ctx, data, scaleX, scaleY, colorMode) => {
+  // Professional chart drawing functions
+  const drawProfessionalLineChart = (ctx, data, scaleX, scaleY, colorMode) => {
+    // Smooth line with gradient
     ctx.strokeStyle = '#3182ce';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
     
+    ctx.beginPath();
     data.forEach((d, i) => {
       const pointX = scaleX(typeof d.x === 'string' ? i : d.x);
       const pointY = scaleY(d.y);
@@ -470,30 +748,33 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
     });
     ctx.stroke();
     
-    // Draw data points
-    if (graphQuality >= 2) {
-      ctx.fillStyle = '#3182ce';
-      data.forEach((d, i) => {
-        if (i % 2 === 0) {
-          const pointX = scaleX(typeof d.x === 'string' ? i : d.x);
-          const pointY = scaleY(d.y);
-          ctx.beginPath();
-          ctx.arc(pointX, pointY, 3, 0, 2 * Math.PI);
-          ctx.fill();
-        }
-      });
-    }
+    // Professional data points
+    ctx.fillStyle = '#3182ce';
+    data.forEach((d, i) => {
+      if (i % Math.ceil(data.length / 10) === 0) { // Sample points
+        const pointX = scaleX(typeof d.x === 'string' ? i : d.x);
+        const pointY = scaleY(d.y);
+        ctx.beginPath();
+        ctx.arc(pointX, pointY, 3, 0, 2 * Math.PI);
+        ctx.fill();
+        
+        // Point border
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    });
   };
 
-  const drawBarChart = (ctx, data, scaleX, scaleY, chartWidth, dataCount, margin, colorMode) => {
-    const barWidth = (chartWidth / dataCount) * 0.8;
+  const drawProfessionalBarChart = (ctx, data, scaleX, scaleY, chartWidth, dataCount, margin, colorMode) => {
+    const barWidth = (chartWidth / dataCount) * 0.7;
     
     data.forEach((d, i) => {
       const x = scaleX(typeof d.x === 'string' ? i : d.x);
       const y = scaleY(d.y);
       const barHeight = margin.top + chartHeight - y;
       
-      // Gradient for bars
+      // Professional gradient for bars
       const gradient = ctx.createLinearGradient(0, y, 0, margin.top + chartHeight);
       gradient.addColorStop(0, '#4299e1');
       gradient.addColorStop(1, '#3182ce');
@@ -501,53 +782,55 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
       ctx.fillStyle = gradient;
       ctx.fillRect(x, y, barWidth, barHeight);
       
-      // Bar border
-      ctx.strokeStyle = colorMode === 'dark' ? '#2b6cb0' : '#2c5282';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x, y, barWidth, barHeight);
+      // Bar shadow effect
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetY = 2;
+      ctx.fillRect(x, y, barWidth, barHeight);
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
       
-      // Value labels
-      if (graphQuality >= 2 && dataCount <= 15) {
+      // Professional value labels
+      if (dataCount <= 12) {
         ctx.fillStyle = colorMode === 'dark' ? '#e2e8f0' : '#2d3748';
-        ctx.font = '10px Arial';
+        ctx.font = '11px "Segoe UI", Arial, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(d.y.toFixed(1), x + barWidth / 2, y - 5);
+        ctx.fillText(d.y.toFixed(1), x + barWidth / 2, y - 8);
       }
     });
   };
 
-  const drawScatterChart = (ctx, data, scaleX, scaleY, colorMode) => {
-    ctx.fillStyle = '#e53e3e';
-    
+  const drawProfessionalScatterChart = (ctx, data, scaleX, scaleY, colorMode) => {
+    // Professional scatter points with variation
     data.forEach((d, i) => {
       const pointX = scaleX(typeof d.x === 'string' ? i : d.x);
       const pointY = scaleY(d.y);
+      
+      // Vary colors slightly for professional look
+      const hue = (i * 137.5) % 360; // Golden angle for distribution
+      ctx.fillStyle = `hsla(${hue}, 70%, 50%, 0.8)`;
       
       ctx.beginPath();
       ctx.arc(pointX, pointY, 4, 0, 2 * Math.PI);
       ctx.fill();
       
-      // Add glow effect for premium quality
-      if (graphQuality >= 3) {
-        ctx.shadowColor = '#e53e3e';
-        ctx.shadowBlur = 10;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-      }
+      // Professional border
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
     });
     
-    // Add trend line for better quality
-    if (graphQuality >= 2) {
-      ctx.strokeStyle = 'rgba(66, 153, 225, 0.6)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
-      ctx.beginPath();
-      
+    // Professional trend line
+    if (data.length >= 5) {
       const firstPointX = scaleX(typeof data[0].x === 'string' ? 0 : data[0].x);
       const firstPointY = scaleY(data[0].y);
       const lastPointX = scaleX(typeof data[data.length-1].x === 'string' ? data.length-1 : data[data.length-1].x);
       const lastPointY = scaleY(data[data.length-1].y);
       
+      ctx.strokeStyle = 'rgba(66, 153, 225, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 3]);
+      ctx.beginPath();
       ctx.moveTo(firstPointX, firstPointY);
       ctx.lineTo(lastPointX, lastPointY);
       ctx.stroke();
@@ -555,11 +838,11 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
     }
   };
 
-  const drawAreaChart = (ctx, data, scaleX, scaleY, chartHeight, margin, colorMode) => {
-    // Create gradient for area
+  const drawProfessionalAreaChart = (ctx, data, scaleX, scaleY, chartHeight, margin, colorMode) => {
+    // Professional area gradient
     const gradient = ctx.createLinearGradient(0, margin.top, 0, margin.top + chartHeight);
     gradient.addColorStop(0, 'rgba(72, 187, 120, 0.8)');
-    gradient.addColorStop(1, 'rgba(72, 187, 120, 0.2)');
+    gradient.addColorStop(1, 'rgba(72, 187, 120, 0.1)');
     
     ctx.fillStyle = gradient;
     ctx.beginPath();
@@ -576,15 +859,16 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
       }
     });
     
-    // Close the path
+    // Close the path professionally
     const lastPointX = scaleX(typeof data[data.length-1].x === 'string' ? data.length-1 : data[data.length-1].x);
     ctx.lineTo(lastPointX, margin.top + chartHeight);
     ctx.closePath();
     ctx.fill();
     
-    // Draw line on top
+    // Professional line on top
     ctx.strokeStyle = '#48bb78';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
     ctx.beginPath();
     
     data.forEach((d, i) => {
@@ -600,7 +884,7 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
     ctx.stroke();
   };
 
-  const generateFallbackGraph = () => {
+  const generateProfessionalFallbackGraph = () => {
     if (!canvasRef.current) return;
     
     const canvas = canvasRef.current;
@@ -609,28 +893,35 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
     
     ctx.clearRect(0, 0, width, height);
     
-    // Simple fallback message
-    ctx.fillStyle = colorMode === 'dark' ? '#2d3748' : '#f7fafc';
+    // Professional fallback design
+    const gradient = ctx.createLinearGradient(0, 0, width, height);
+    gradient.addColorStop(0, colorMode === 'dark' ? '#2d3748' : '#f7fafc');
+    gradient.addColorStop(1, colorMode === 'dark' ? '#4a5568' : '#edf2f7');
+    ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
     
     ctx.fillStyle = colorMode === 'dark' ? '#e2e8f0' : '#2d3748';
-    ctx.font = '16px Arial';
+    ctx.font = '16px "Segoe UI", Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Unable to generate visualization', width / 2, height / 2);
+    ctx.fillText('Data Visualization Unavailable', width / 2, height / 2 - 20);
     
-    ctx.font = '12px Arial';
+    ctx.font = '14px "Segoe UI", Arial, sans-serif';
     ctx.fillStyle = colorMode === 'dark' ? '#a0aec0' : '#718096';
-    ctx.fillText('Check console for details', width / 2, height / 2 + 30);
+    ctx.fillText('Insufficient or unrecognized data patterns', width / 2, height / 2 + 10);
+    
+    ctx.fillStyle = colorMode === 'dark' ? '#4a5568' : '#e2e8f0';
+    ctx.font = '12px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Try running code that generates numerical output', width / 2, height / 2 + 40);
   };
 
   const regenerateGraph = () => {
     if (visualizationAnalysis) {
-      generateEnhancedGraph(visualizationAnalysis);
+      generateRealisticGraph(visualizationAnalysis);
       
       toast({
-        title: `Graph regenerated`,
-        description: `Using ${currentChartType} chart type`,
+        title: `Graph Updated`,
+        description: `Refreshed ${currentChartType} visualization`,
         status: "info",
         duration: 1500,
         position: "top-right"
@@ -642,7 +933,7 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
     setCurrentChartType(type);
     if (visualizationAnalysis) {
       setTimeout(() => {
-        generateEnhancedGraph(visualizationAnalysis);
+        generateRealisticGraph(visualizationAnalysis);
       }, 100);
     }
   };
@@ -651,13 +942,13 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
     if (canvasRef.current) {
       const canvas = canvasRef.current;
       const link = document.createElement('a');
-      link.download = `graph-${language}-${currentChartType}-${Date.now()}.png`;
+      link.download = `analysis-${language}-${currentChartType}-${Date.now()}.png`;
       link.href = canvas.toDataURL();
       link.click();
       
       toast({
-        title: "Graph downloaded",
-        description: "The graph has been saved as PNG",
+        title: "Analysis Downloaded",
+        description: "Chart saved as high-quality PNG",
         status: "success",
         duration: 2000,
         position: "top-right"
@@ -665,12 +956,12 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
     }
   };
 
-  // Visualization Popup Component
+  // Enhanced Visualization Popup Component
   const VisualizationPopup = () => {
     if (!showVisualizationPopup || !visualizationAnalysis) return null;
 
     return (
-      <Modal isOpen={showVisualizationPopup} onClose={handleDismissTemporarily} size="md">
+      <Modal isOpen={showVisualizationPopup} onClose={handleDismissTemporarily} size="lg">
         <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
         <ModalContent 
           bg={colorMode === 'dark' ? 'gray.800' : 'white'}
@@ -688,7 +979,10 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
             <HStack justify="space-between">
               <HStack spacing={3}>
                 <FaChartLine size={20} />
-                <Text fontSize="lg" fontWeight="bold">Data Visualization Available</Text>
+                <VStack align="start" spacing={0}>
+                  <Text fontSize="lg" fontWeight="bold">Data Analysis Available</Text>
+                  <Text fontSize="sm" opacity={0.9}>Automated visualization detected</Text>
+                </VStack>
               </HStack>
               <IconButton
                 icon={<FaTimes />}
@@ -707,41 +1001,59 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
               <Alert status="info" borderRadius="md">
                 <AlertIcon />
                 <AlertDescription fontSize="sm">
-                  We detected data in your {language} output that can be visualized.
+                  We analyzed your {language} output and found data patterns suitable for visualization.
                 </AlertDescription>
               </Alert>
 
-              <Box p={3} bg={colorMode === 'dark' ? 'gray.700' : 'gray.100'} borderRadius="md">
-                <VStack spacing={2} align="start">
-                  <HStack>
+              <Box p={4} bg={colorMode === 'dark' ? 'gray.700' : 'gray.50'} borderRadius="md">
+                <VStack spacing={3} align="start">
+                  <HStack spacing={2}>
                     <Badge colorScheme="green" fontSize="xs">
                       {visualizationAnalysis.confidence}% CONFIDENCE
                     </Badge>
                     <Badge colorScheme="blue" fontSize="xs">
-                      {visualizationAnalysis.type.replace('_', ' ').toUpperCase()}
+                      {visualizationAnalysis.dataStructure.type.toUpperCase()}
+                    </Badge>
+                    <Badge colorScheme="orange" fontSize="xs">
+                      {visualizationAnalysis.dataQuality.toUpperCase()} QUALITY
                     </Badge>
                   </HStack>
                   
-                  <Text fontSize="sm" fontWeight="medium">
-                    Detection Details:
-                  </Text>
-                  <VStack spacing={1} align="start" pl={2}>
-                    {visualizationAnalysis.reasons.slice(0, 3).map((reason, index) => (
-                      <Text key={index} fontSize="xs" color={colorMode === 'dark' ? 'gray.300' : 'gray.600'}>
-                        • {reason}
-                      </Text>
-                    ))}
-                    {visualizationAnalysis.dataPoints > 0 && (
+                  <VStack spacing={1} align="start" width="100%">
+                    <Text fontSize="sm" fontWeight="medium">Analysis Details:</Text>
+                    <Box pl={2}>
                       <Text fontSize="xs" color={colorMode === 'dark' ? 'gray.300' : 'gray.600'}>
-                        • {visualizationAnalysis.dataPoints} data points found
+                        • {visualizationAnalysis.dataPoints} data points extracted
                       </Text>
-                    )}
+                      <Text fontSize="xs" color={colorMode === 'dark' ? 'gray.300' : 'gray.600'}>
+                        • {visualizationAnalysis.dataStructure.dimensions}D data structure
+                      </Text>
+                      {visualizationAnalysis.reasons.slice(0, 2).map((reason, index) => (
+                        <Text key={index} fontSize="xs" color={colorMode === 'dark' ? 'gray.300' : 'gray.600'}>
+                          • {reason}
+                        </Text>
+                      ))}
+                    </Box>
                   </VStack>
+                  
+                  <FormControl size="sm">
+                    <FormLabel fontSize="xs">Suggested Chart Type</FormLabel>
+                    <Select 
+                      size="sm"
+                      value={currentChartType}
+                      onChange={(e) => setCurrentChartType(e.target.value)}
+                    >
+                      <option value="line">Line Chart</option>
+                      <option value="bar">Bar Chart</option>
+                      <option value="scatter">Scatter Plot</option>
+                      <option value="area">Area Chart</option>
+                    </Select>
+                  </FormControl>
                 </VStack>
               </Box>
 
               <Text fontSize="sm" color={colorMode === 'dark' ? 'gray.300' : 'gray.600'}>
-                Would you like to view an automated visualization of your data?
+                Generate an automated visualization to better understand your data patterns?
               </Text>
             </VStack>
           </ModalBody>
@@ -770,7 +1082,7 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
                   leftIcon={<FaEye />}
                   onClick={handleViewVisualization}
                 >
-                  View Visualization
+                  Generate Visualization
                 </Button>
               </HStack>
             </HStack>
@@ -780,60 +1092,125 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
     );
   };
 
-  // Chart type selector - FIXED with ButtonGroup import
-  const ChartTypeSelector = () => (
-    <HStack spacing={2} mb={4} p={3} bg={colorMode === 'dark' ? 'gray.800' : 'gray.50'} borderRadius="md">
-      <Text fontSize="sm" fontWeight="medium">Chart Type:</Text>
-      <ButtonGroup size="sm" isAttached variant="outline">
-        <IconButton
-          icon={<FaWaveSquare />}
-          onClick={() => changeChartType('line')}
-          colorScheme={currentChartType === 'line' ? 'blue' : 'gray'}
-          aria-label="Line Chart"
-        />
-        <IconButton
-          icon={<FaChartBar />}
-          onClick={() => changeChartType('bar')}
-          colorScheme={currentChartType === 'bar' ? 'blue' : 'gray'}
-          aria-label="Bar Chart"
-        />
-        <IconButton
-          icon={<FaChartArea />}
-          onClick={() => changeChartType('area')}
-          colorScheme={currentChartType === 'area' ? 'blue' : 'gray'}
-          aria-label="Area Chart"
-        />
-        <IconButton
-          icon={<FaChartLine />}
-          onClick={() => changeChartType('scatter')}
-          colorScheme={currentChartType === 'scatter' ? 'blue' : 'gray'}
-          aria-label="Scatter Plot"
-        />
-      </ButtonGroup>
-    </HStack>
+  // Professional Chart Controls
+  const ChartControls = () => (
+    <VStack spacing={3} mb={4} p={4} bg={colorMode === 'dark' ? 'gray.800' : 'gray.50'} borderRadius="md">
+      <HStack spacing={4} width="100%">
+        <FormControl size="sm" maxW="200px">
+          <FormLabel fontSize="xs">Chart Type</FormLabel>
+          <Select 
+            value={currentChartType}
+            onChange={(e) => changeChartType(e.target.value)}
+          >
+            <option value="line">Line Chart</option>
+            <option value="bar">Bar Chart</option>
+            <option value="scatter">Scatter Plot</option>
+            <option value="area">Area Chart</option>
+          </Select>
+        </FormControl>
+        
+        <FormControl size="sm" maxW="150px">
+          <FormLabel fontSize="xs">Data Points</FormLabel>
+          <NumberInput 
+            value={dataPoints}
+            onChange={(value) => setDataPoints(parseInt(value) || 20)}
+            min={5}
+            max={100}
+          >
+            <NumberInputField />
+            <NumberInputStepper>
+              <NumberIncrementStepper />
+              <NumberDecrementStepper />
+            </NumberInputStepper>
+          </NumberInput>
+        </FormControl>
+      </HStack>
+      
+      <HStack spacing={2} width="100%">
+        <Button
+          size="sm"
+          leftIcon={<FaSync />}
+          onClick={regenerateGraph}
+          isLoading={isGeneratingGraph}
+          colorScheme="blue"
+          variant="outline"
+        >
+          Refresh
+        </Button>
+        
+        <Button
+          size="sm"
+          leftIcon={<FaTable />}
+          onClick={() => setShowRawData(!showRawData)}
+          variant="outline"
+        >
+          {showRawData ? 'Hide Data' : 'View Data'}
+        </Button>
+      </HStack>
+    </VStack>
   );
+
+  // Raw Data Viewer
+  const RawDataViewer = () => {
+    if (!showRawData || !visualizationAnalysis) return null;
+    
+    const numericalData = RealisticDataParser.parseNumericalData(output);
+    
+    return (
+      <Box mb={4} p={4} bg={colorMode === 'dark' ? 'gray.800' : 'gray.50'} borderRadius="md">
+        <HStack justify="space-between" mb={3}>
+          <Text fontSize="sm" fontWeight="bold">Extracted Numerical Data</Text>
+          <Badge colorScheme="blue">{numericalData.length} values</Badge>
+        </HStack>
+        <Box 
+          p={3} 
+          bg={colorMode === 'dark' ? 'gray.900' : 'white'} 
+          borderRadius="md"
+          maxH="200px"
+          overflowY="auto"
+          fontFamily="mono"
+          fontSize="xs"
+        >
+          <pre>{numericalData.slice(0, 50).join(', ')}</pre>
+          {numericalData.length > 50 && (
+            <Text fontSize="xs" color="gray.500" mt={2}>
+              ... and {numericalData.length - 50} more values
+            </Text>
+          )}
+        </Box>
+      </Box>
+    );
+  };
 
   // Main graphical content
   const renderGraphicalContent = () => {
     if (!visualizationAnalysis || !output) {
       return (
-        <VStack spacing={4} justify="center" h="300px" opacity={0.7}>
-          <Spinner size="lg" color="purple.500" />
-          <Text>Waiting for code execution...</Text>
-          <Text fontSize="sm">Run your code to see graphical output</Text>
+        <VStack spacing={4} justify="center" h="400px" opacity={0.7}>
+          <Spinner size="lg" color="purple.500" thickness="3px" />
+          <VStack spacing={1}>
+            <Text fontSize="lg" fontWeight="medium">Analyzing Data...</Text>
+            <Text fontSize="sm" color={colorMode === 'dark' ? 'gray.400' : 'gray.600'}>
+              Run your code to generate graphical analysis
+            </Text>
+          </VStack>
         </VStack>
       );
     }
 
     if (!visualizationAnalysis.hasVisualization) {
       return (
-        <VStack spacing={4} justify="center" h="300px" opacity={0.7}>
-          <FaChartLine size={48} />
-          <Text>No visualization data detected</Text>
-          <Text fontSize="sm">The output doesn't contain recognizable data patterns</Text>
-          <Badge colorScheme="yellow" fontSize="xs">
-            Confidence: {visualizationAnalysis.confidence}%
-          </Badge>
+        <VStack spacing={4} justify="center" h="400px" opacity={0.7}>
+          <FaDatabase size={48} color={colorMode === 'dark' ? '#4a5568' : '#a0aec0'} />
+          <VStack spacing={1}>
+            <Text fontSize="lg" fontWeight="medium">Limited Visualization Data</Text>
+            <Text fontSize="sm" color={colorMode === 'dark' ? 'gray.400' : 'gray.600'}>
+              Output doesn't contain recognizable numerical patterns
+            </Text>
+            <Badge colorScheme="yellow" fontSize="xs" mt={2}>
+              Confidence: {visualizationAnalysis.confidence}%
+            </Badge>
+          </VStack>
         </VStack>
       );
     }
@@ -847,38 +1224,38 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
           border="1px solid"
           borderColor={colorMode === 'dark' ? 'gray.600' : 'gray.200'}
         >
-          <HStack justify="space-between" mb={3}>
+          <HStack justify="space-between" mb={4}>
+            <VStack align="start" spacing={1}>
+              <Text fontSize="lg" fontWeight="bold">Data Analysis</Text>
+              <HStack spacing={2}>
+                <Badge colorScheme="green" fontSize="xs">
+                  AUTO-DETECTED
+                </Badge>
+                <Badge colorScheme="blue" fontSize="xs">
+                  {language.toUpperCase()}
+                </Badge>
+                <Badge colorScheme="purple" fontSize="xs">
+                  {visualizationAnalysis.confidence}% CONFIDENCE
+                </Badge>
+              </HStack>
+            </VStack>
             <HStack spacing={2}>
-              <Badge colorScheme="green" fontSize="sm">
-                AUTO-DETECTED
-              </Badge>
-              <Badge colorScheme="blue" fontSize="sm">
-                {language.toUpperCase()}
-              </Badge>
-              <Badge colorScheme="purple" fontSize="sm">
-                {visualizationAnalysis.confidence}% CONFIDENCE
-              </Badge>
-              <Badge colorScheme="orange" fontSize="sm">
-                {currentChartType.toUpperCase()}
-              </Badge>
-            </HStack>
-            <HStack spacing={2}>
-              <Tooltip label="Regenerate Graph">
+              <Tooltip label="Refresh Analysis">
                 <IconButton
                   size="sm"
                   icon={<FaSync />}
                   onClick={regenerateGraph}
-                  aria-label="Regenerate graph"
+                  aria-label="Refresh analysis"
                   colorScheme="blue"
                   isLoading={isGeneratingGraph}
                 />
               </Tooltip>
-              <Tooltip label="Download Graph">
+              <Tooltip label="Download Chart">
                 <IconButton
                   size="sm"
                   icon={<FaDownload />}
                   onClick={downloadImage}
-                  aria-label="Download graph"
+                  aria-label="Download chart"
                   colorScheme="green"
                 />
               </Tooltip>
@@ -893,14 +1270,17 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
             </HStack>
           </HStack>
 
-          {/* Chart Type Selector - MOVED HERE */}
-          <ChartTypeSelector />
+          {/* Chart Controls */}
+          <ChartControls />
+
+          {/* Raw Data Viewer */}
+          <RawDataViewer />
 
           {isGeneratingGraph && (
             <Box mb={3}>
               <Progress size="sm" isIndeterminate colorScheme="purple" />
               <Text fontSize="xs" textAlign="center" mt={1}>
-                Generating {currentChartType} visualization from {language} output...
+                Generating {currentChartType} visualization from {language} data...
               </Text>
             </Box>
           )}
@@ -920,8 +1300,7 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
         <Alert status="success" borderRadius="md">
           <AlertIcon />
           <AlertDescription fontSize="sm">
-            <strong>Graphical output auto-generated!</strong> The system detected {language} data patterns and created a {currentChartType} visualization. 
-            {visualizationAnalysis.reasons.length > 0 && ` ${visualizationAnalysis.reasons.length} patterns detected.`}
+            <strong>Automated data analysis complete!</strong> The system analyzed {visualizationAnalysis.dataPoints} data points from your {language} output and generated a {currentChartType} visualization. Data quality: {visualizationAnalysis.dataQuality}.
           </AlertDescription>
         </Alert>
       </VStack>
@@ -947,7 +1326,7 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
             <Tab>
               <HStack spacing={2}>
                 <FaChartLine />
-                <Text>Graphical View</Text>
+                <Text>Data Analysis</Text>
                 {visualizationAnalysis?.hasVisualization && (
                   <Badge colorScheme="green" fontSize="xs" borderRadius="full">
                     ✓
@@ -987,7 +1366,7 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
         </Tabs>
       </Box>
 
-      {/* Visualization Status Indicator */}
+      {/* Data Analysis Status Indicator */}
       {visualizationAnalysis && (
         <Box
           position="fixed"
@@ -997,7 +1376,7 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
           bg={colorMode === 'dark' ? 'gray.800' : 'white'}
           borderRadius="md"
           border="1px solid"
-          borderColor={visualizationAnalysis.hasVisualization ? 'green.500' : 'gray.300'}
+          borderColor={visualizationAnalysis.hasVisualization ? 'green.500' : 'yellow.500'}
           boxShadow="lg"
           zIndex={1000}
           maxW="300px"
@@ -1006,19 +1385,19 @@ export const GraphicalOutput = ({ output, language, isLoading, executionData, co
             <Box
               p={2}
               borderRadius="full"
-              bg={visualizationAnalysis.hasVisualization ? 'green.500' : 'gray.500'}
+              bg={visualizationAnalysis.hasVisualization ? 'green.500' : 'yellow.500'}
               color="white"
             >
               <FaChartLine size={14} />
             </Box>
             <VStack spacing={0} align="start">
               <Text fontSize="sm" fontWeight="bold">
-                {visualizationAnalysis.hasVisualization ? 'Data Visualizable' : 'No Visual Data'}
+                {visualizationAnalysis.hasVisualization ? 'Data Analyzed' : 'Limited Data'}
               </Text>
               <Text fontSize="xs" color={colorMode === 'dark' ? 'gray.400' : 'gray.600'}>
                 {visualizationAnalysis.hasVisualization 
-                  ? `${visualizationAnalysis.confidence}% confidence` 
-                  : 'Limited visualization options'
+                  ? `${visualizationAnalysis.dataPoints} points, ${visualizationAnalysis.confidence}% confidence` 
+                  : `${visualizationAnalysis.dataPoints} values found`
                 }
               </Text>
             </VStack>

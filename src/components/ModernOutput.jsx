@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Box,
   Button,
@@ -28,7 +28,11 @@ import {
   ModalContent,
   ModalHeader,
   ModalBody,
-  ModalCloseButton
+  ModalCloseButton,
+  Alert,
+  AlertIcon,
+  AlertDescription,
+  CloseButton
 } from "@chakra-ui/react";
 import { 
   FaPlay, 
@@ -48,16 +52,77 @@ import {
   FaRocket,
   FaDesktop,
   FaCode,
-  FaChartLine
+  FaChartLine,
+  FaExclamationCircle
 } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
-import { executeCode, executeWebCode, analyzeInputRequirements } from "../utils/compilerApis";
+import { executeCode, executeWebCode, analyzeInputRequirements, LANGUAGE_MAPPING, detectLanguageFromCode, validateCodeForLanguage } from "../utils/compilerApis";
 import { PreviewMode } from "./PreviewMode";
 import { Terminal } from "./terminal";
 import { InputModal } from "./InputModal";
 import { GraphicalOutput } from "./GraphicalOutput";
 
 const MotionBox = motion(Box);
+
+// 3D Tab Component with enhanced effects
+const ModernTab = ({ children, isSelected, ...props }) => (
+  <MotionBox
+    position="relative"
+    initial={false}
+    animate={{
+      scale: isSelected ? 1.05 : 1,
+      y: isSelected ? -2 : 0,
+      z: isSelected ? 10 : 0
+    }}
+    transition={{
+      type: "spring",
+      stiffness: 400,
+      damping: 25
+    }}
+    whileHover={{
+      scale: 1.02,
+      y: -1
+    }}
+    style={{
+      perspective: 1000
+    }}
+  >
+    <Box
+      bg={isSelected ? 
+        'linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%)' : 
+        'transparent'
+      }
+      border="1px solid"
+      borderColor={isSelected ? 
+        'rgba(168, 85, 247, 0.3)' : 
+        'rgba(255, 255, 255, 0.1)'
+      }
+      borderRadius="12px 12px 0 0"
+      p={3}
+      cursor="pointer"
+      position="relative"
+      overflow="hidden"
+      _before={isSelected ? {
+        content: '""',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '2px',
+        background: 'linear-gradient(90deg, #a855f7, #8b5cf6)',
+        borderRadius: '2px'
+      } : {}}
+      boxShadow={isSelected ? 
+        '0 4px 20px rgba(168, 85, 247, 0.15), 0 2px 8px rgba(168, 85, 247, 0.1)' : 
+        'none'
+      }
+      backdropFilter="blur(10px)"
+      {...props}
+    >
+      {children}
+    </Box>
+  </MotionBox>
+);
 
 const LogEntry = ({ log, colorMode }) => {
   const getLogStyle = (type) => {
@@ -131,6 +196,36 @@ const LogEntry = ({ log, colorMode }) => {
   );
 };
 
+// Language Compatibility Warning Component
+const LanguageWarningAlert = ({ warning, onClear, onIgnore, colorMode }) => {
+  if (!warning) return null;
+
+  return (
+    <Alert status="warning" borderRadius="md" mb={3}>
+      <AlertIcon />
+      <AlertDescription flex="1">
+        <VStack align="start" spacing={1}>
+          <Text fontSize="sm" fontWeight="medium">
+            Language Compatibility Issue
+          </Text>
+          <Text fontSize="xs">
+            {warning}
+          </Text>
+        </VStack>
+      </AlertDescription>
+      <HStack spacing={1}>
+        <Button size="xs" colorScheme="orange" variant="outline" onClick={onClear}>
+          Clear Editor
+        </Button>
+        <Button size="xs" colorScheme="orange" variant="ghost" onClick={onIgnore}>
+          Ignore
+        </Button>
+        <CloseButton size="sm" onClick={onIgnore} />
+      </HStack>
+    </Alert>
+  );
+};
+
 export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, onFileSystemChange }) => {
   const { colorMode } = useColorMode();
   const toast = useToast();
@@ -154,15 +249,186 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [isRocketMode, setIsRocketMode] = useState(false);
-  const [showTerminal, setShowTerminal] = useState(false);
   const [compilerStatus, setCompilerStatus] = useState('ready');
   const [showGraphicalModal, setShowGraphicalModal] = useState(false);
   
-  // NEW: Active tab state management
+  // Active tab state management - ALWAYS show output in active tab
   const [activeTab, setActiveTab] = useState(0);
   const [hasOutput, setHasOutput] = useState(false);
   const [hasGraphicalData, setHasGraphicalData] = useState(false);
   const [executionResult, setExecutionResult] = useState(null);
+  
+  // Language state management with persistence
+  const [currentLanguage, setCurrentLanguage] = useState(language);
+  const [languageWarning, setLanguageWarning] = useState(null);
+  const [codeHistory, setCodeHistory] = useState({});
+  const executionCountRef = useRef(0);
+  const previousLanguageRef = useRef(language);
+
+  // Enhanced Language change detection with code persistence and validation
+  useEffect(() => {
+    if (language !== previousLanguageRef.current) {
+      console.log(`🔄 Language changed from ${previousLanguageRef.current} to ${language}`);
+      
+      const sourceCode = getCurrentCode();
+      
+      // Save current code to history before switching
+      if (sourceCode && sourceCode.trim().length > 0) {
+        setCodeHistory(prev => ({
+          ...prev,
+          [previousLanguageRef.current]: sourceCode
+        }));
+      }
+      
+      // Complete cleanup before switching language
+      setOutput("");
+      setError(null);
+      setLogs([]);
+      setHasOutput(false);
+      setHasGraphicalData(false);
+      setUserInput('');
+      setCompilerStatus('ready');
+      setActiveTab(0); // Reset to Console tab
+      setLanguageWarning(null);
+      
+      // Check for code compatibility and handle automatic clearing
+      const validation = validateCodeForLanguage(sourceCode, language);
+      const detectedLanguage = detectLanguageFromCode(sourceCode);
+      
+      // If code is incompatible with new language, show warning and optionally clear
+      if (!validation.valid && sourceCode.trim().length > 0) {
+        setLanguageWarning(validation.error);
+        
+        // Auto-clear if switching between completely different language families
+        const incompatibleFamilies = {
+          python: ['java', 'cpp', 'c', 'csharp', 'javascript'],
+          java: ['python', 'cpp', 'c', 'javascript', 'php'],
+          cpp: ['python', 'java', 'javascript', 'php', 'ruby'],
+          javascript: ['python', 'java', 'cpp', 'c', 'csharp'],
+          php: ['python', 'java', 'cpp', 'c', 'javascript']
+        };
+        
+        const fromFamily = incompatibleFamilies[previousLanguageRef.current] || [];
+        const shouldAutoClear = fromFamily.includes(language) && sourceCode.trim().length > 50;
+        
+        if (shouldAutoClear) {
+          // Restore code from history if available for the new language
+          const restoredCode = codeHistory[language] || '';
+          setEditorCode(restoredCode);
+          
+          setLogs(prev => [...prev, {
+            id: Date.now(),
+            type: 'warning',
+            message: `🧹 Auto-cleared incompatible ${getLanguageDisplayName(previousLanguageRef.current)} code. ${restoredCode ? 'Restored previous ' + getLanguageDisplayName(language) + ' code.' : ''}`,
+            timestamp: new Date().toLocaleTimeString()
+          }]);
+        } else {
+          setLogs(prev => [...prev, {
+            id: Date.now(),
+            type: 'warning',
+            message: `⚠️ Code may be incompatible with ${getLanguageDisplayName(language)}. Detected ${getLanguageDisplayName(detectedLanguage)} patterns.`,
+            timestamp: new Date().toLocaleTimeString()
+          }]);
+        }
+      } else if (sourceCode.trim().length > 0) {
+        // Restore code from history if available
+        const restoredCode = codeHistory[language] || sourceCode;
+        if (restoredCode !== sourceCode) {
+          setEditorCode(restoredCode);
+        }
+      }
+      
+      // Add language change log
+      setLogs(prev => [...prev, {
+        id: Date.now(),
+        type: 'info',
+        message: `🔄 Switched from ${getLanguageDisplayName(previousLanguageRef.current)} to ${getLanguageDisplayName(language)}`,
+        timestamp: new Date().toLocaleTimeString()
+      }]);
+      
+      // Update references
+      previousLanguageRef.current = language;
+      setCurrentLanguage(language);
+      
+      // Show language change notification
+      toast({
+        title: `Language Changed to ${getLanguageDisplayName(language)}`,
+        description: `Compiler configured for ${getLanguageDisplayName(language)} execution`,
+        status: "info",
+        duration: 2000,
+        position: "top-right"
+      });
+    }
+  }, [language, toast]);
+
+  // Helper functions for code management
+  const getCurrentCode = () => {
+    if (editorRef.current?.getValue) {
+      return editorRef.current.getValue();
+    } else if (editorRef.current?.editor?.getValue) {
+      return editorRef.current.editor.getValue();
+    } else if (typeof editorRef.current === 'string') {
+      return editorRef.current;
+    } else {
+      return localStorage.getItem('currentCode') || '';
+    }
+  };
+
+  const setEditorCode = (code) => {
+    if (editorRef.current?.setValue) {
+      editorRef.current.setValue(code);
+    } else if (editorRef.current?.editor?.setValue) {
+      editorRef.current.editor.setValue(code);
+    } else {
+      localStorage.setItem('currentCode', code);
+    }
+  };
+
+  // Get language display name
+  const getLanguageDisplayName = (lang) => {
+    const langMap = {
+      'python': 'Python',
+      'javascript': 'JavaScript',
+      'java': 'Java',
+      'cpp': 'C++',
+      'c': 'C',
+      'csharp': 'C#',
+      'php': 'PHP',
+      'ruby': 'Ruby',
+      'go': 'Go',
+      'rust': 'Rust',
+      'swift': 'Swift',
+      'kotlin': 'Kotlin',
+      'html': 'HTML',
+      'css': 'CSS',
+      'typescript': 'TypeScript'
+    };
+    return langMap[lang] || lang.toUpperCase();
+  };
+
+  // Get API information for current language
+  const getApiInfo = () => {
+    const langKey = language.toLowerCase();
+    const langInfo = LANGUAGE_MAPPING[langKey] || LANGUAGE_MAPPING['python'];
+    const apiInfo = {
+      name: 'Unknown API',
+      type: 'unknown',
+      supportsBackend: false,
+      supportsPiston: false
+    };
+
+    if (langInfo.backend) {
+      apiInfo.name = 'CoderPoint Cloud';
+      apiInfo.type = 'backend';
+      apiInfo.supportsBackend = true;
+    } else if (langInfo.piston) {
+      apiInfo.name = 'Piston';
+      apiInfo.type = 'piston';
+      apiInfo.supportsPiston = true;
+    }
+
+    return apiInfo;
+  };
 
   // Create default handlers if not provided
   const handleFileSelect = onFileSelect || (() => {
@@ -200,51 +466,10 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
 
   // Analyze input requirements when code changes
   const analyzeCodeForInput = () => {
-    const sourceCode = editorRef.current?.getValue();
+    const sourceCode = getCurrentCode();
     if (!sourceCode) return [];
     
     return analyzeInputRequirements(sourceCode, language);
-  };
-
-  // NEW: Auto-switch to appropriate tab based on output type
-  const autoSwitchTab = (result, outputText, hasError) => {
-    setHasOutput(true);
-    
-    // Check if output has graphical data patterns
-    const hasGraphicalPatterns = checkForGraphicalData(outputText);
-    setHasGraphicalData(hasGraphicalPatterns);
-    
-    if (hasError) {
-      // Switch to Problems tab for errors
-      setActiveTab(3); // Problems tab
-      toast({
-        title: "Execution completed with errors",
-        description: "Switched to Problems tab",
-        status: "warning",
-        duration: 2000,
-        position: "top-right"
-      });
-    } else if (hasGraphicalPatterns) {
-      // Switch to Graphical tab for visualizable data
-      setActiveTab(2); // Graphical tab
-      toast({
-        title: "Graphical data detected",
-        description: "Switched to Graphical tab",
-        status: "info",
-        duration: 2000,
-        position: "top-right"
-      });
-    } else if (outputText && outputText.length > 0) {
-      // Switch to Output tab for regular output
-      setActiveTab(1); // Output tab
-      toast({
-        title: "Execution completed",
-        description: "Switched to Output tab",
-        status: "success",
-        duration: 1500,
-        position: "top-right"
-      });
-    }
   };
 
   // Check if output contains graphical data patterns
@@ -269,22 +494,88 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
     return graphicalPatterns.some(pattern => pattern.test(outputText));
   };
 
+  // Enhanced code cleaning for language switching
+  const cleanCodeForExecution = (code, targetLanguage) => {
+    if (!code) return code;
+    
+    let cleanedCode = code.trim();
+    
+    // Remove common artifacts from previous language executions
+    const cleanupPatterns = [
+      /\/\*[\s\S]*?\*\//g, // Multi-line comments
+      /\/\/.*$/gm, // Single line comments
+      /#.*$/gm, // Python/PHP comments
+      /<!--[\s\S]*?-->/g, // HTML comments
+    ];
+    
+    cleanupPatterns.forEach(pattern => {
+      cleanedCode = cleanedCode.replace(pattern, '');
+    });
+    
+    // Language-specific cleaning and structure
+    switch (targetLanguage) {
+      case 'python':
+        // Remove PHP, Java, C++ artifacts
+        cleanedCode = cleanedCode.replace(/<\?php[\s\S]*?\?>/g, '');
+        cleanedCode = cleanedCode.replace(/<\?[\s\S]*?\?>/g, '');
+        cleanedCode = cleanedCode.replace(/namespace\s+.*?\{/g, '');
+        cleanedCode = cleanedCode.replace(/using\s+.*?;/g, '');
+        cleanedCode = cleanedCode.replace(/public\s+class/g, '');
+        cleanedCode = cleanedCode.replace(/void\s+main/g, '');
+        cleanedCode = cleanedCode.replace(/int\s+main/g, '');
+        cleanedCode = cleanedCode.replace(/#include.*$/gm, '');
+        break;
+        
+      case 'php':
+        // Ensure proper PHP tags and remove other language artifacts
+        cleanedCode = cleanedCode.replace(/public\s+class/g, '');
+        cleanedCode = cleanedCode.replace(/void\s+main/g, '');
+        cleanedCode = cleanedCode.replace(/int\s+main/g, '');
+        cleanedCode = cleanedCode.replace(/namespace\s+.*?\{/g, '');
+        cleanedCode = cleanedCode.replace(/using\s+.*?;/g, '');
+        if (!cleanedCode.includes('<?php') && !cleanedCode.trim().startsWith('<?')) {
+          cleanedCode = `<?php\n${cleanedCode}\n?>`;
+        }
+        break;
+        
+      case 'java':
+        // Remove PHP, Python artifacts and ensure Java structure
+        cleanedCode = cleanedCode.replace(/<\?php[\s\S]*?\?>/g, '');
+        cleanedCode = cleanedCode.replace(/<\?[\s\S]*?\?>/g, '');
+        cleanedCode = cleanedCode.replace(/def\s+.*?:/g, '');
+        cleanedCode = cleanedCode.replace(/print\(.*?\)/g, '');
+        if (!cleanedCode.includes('public class') && !cleanedCode.includes('class')) {
+          cleanedCode = `public class Main {\n    public static void main(String[] args) {\n        ${cleanedCode}\n    }\n}`;
+        }
+        break;
+        
+      case 'cpp':
+        // Remove artifacts and ensure C++ structure
+        cleanedCode = cleanedCode.replace(/<\?php[\s\S]*?\?>/g, '');
+        cleanedCode = cleanedCode.replace(/def\s+.*?:/g, '');
+        cleanedCode = cleanedCode.replace(/print\(.*?\)/g, '');
+        if (!cleanedCode.includes('int main') && !cleanedCode.includes('void main')) {
+          cleanedCode = `#include <iostream>\nusing namespace std;\n\nint main() {\n    ${cleanedCode}\n    return 0;\n}`;
+        }
+        break;
+        
+      case 'c':
+        // Remove artifacts and ensure C structure
+        cleanedCode = cleanedCode.replace(/<\?php[\s\S]*?\?>/g, '');
+        cleanedCode = cleanedCode.replace(/def\s+.*?:/g, '');
+        cleanedCode = cleanedCode.replace(/print\(.*?\)/g, '');
+        if (!cleanedCode.includes('int main') && !cleanedCode.includes('void main')) {
+          cleanedCode = `#include <stdio.h>\n\nint main() {\n    ${cleanedCode}\n    return 0;\n}`;
+        }
+        break;
+    }
+    
+    return cleanedCode.trim();
+  };
+
   // Handle run code with input modal logic
   const handleRunCode = (turboMode = false) => {
-    let sourceCode = '';
-    
-    // Multiple ways to get the code
-    if (editorRef.current?.getValue) {
-      sourceCode = editorRef.current.getValue();
-    } else if (editorRef.current?.editor?.getValue) {
-      sourceCode = editorRef.current.editor.getValue();
-    } else if (editorRef.current) {
-      // Try direct access
-      sourceCode = editorRef.current;
-    } else {
-      // Fallback: try to get from localStorage or props
-      sourceCode = localStorage.getItem('currentCode') || '';
-    }
+    const sourceCode = getCurrentCode();
 
     if (!sourceCode || sourceCode.trim().length === 0) {
       toast({
@@ -298,14 +589,52 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
       return;
     }
 
-    console.log('Code to execute:', sourceCode.substring(0, 100) + '...');
+    console.log(`🚀 Executing ${language} code:`, sourceCode.substring(0, 100) + '...');
 
-    // Reset output state
+    // Validate code for current language
+    const validation = validateCodeForLanguage(sourceCode, language);
+    if (!validation.valid) {
+      toast({
+        title: "Language Mismatch Detected",
+        description: validation.error,
+        status: "error",
+        duration: 5000,
+        position: "top-right",
+        isClosable: true
+      });
+      
+      setError(validation.error);
+      setLogs(prev => [...prev, {
+        id: Date.now(),
+        type: 'error',
+        message: `❌ ${validation.error}`,
+        timestamp: new Date().toLocaleTimeString()
+      }]);
+      setHasOutput(true);
+      setActiveTab(1); // Switch to Output tab
+      return;
+    }
+
+    // Reset output state but KEEP current active tab
     setOutput("");
     setError(null);
     setLogs([]);
     setHasOutput(false);
     setHasGraphicalData(false);
+    setLanguageWarning(null);
+
+    // Show API information
+    const apiInfo = getApiInfo();
+    setLogs(prev => [...prev, {
+      id: Date.now(),
+      type: 'info',
+      message: `🔧 Using ${apiInfo.name} for ${getLanguageDisplayName(language)} execution`,
+      timestamp: new Date().toLocaleTimeString()
+    }]);
+
+    // Clean the code before execution
+    const cleanedCode = cleanCodeForExecution(sourceCode, language);
+    console.log(`🧹 Cleaned code for ${language}:`, cleanedCode.substring(0, 100) + '...');
 
     // Analyze input requirements for ALL languages
     const detectedInputFields = analyzeCodeForInput();
@@ -313,43 +642,53 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
     if (detectedInputFields.length > 0) {
       // Show input modal
       setInputFields(detectedInputFields);
-      setPendingExecution({ turboMode });
+      setPendingExecution({ turboMode, cleanedCode });
       onOpen();
     } else {
       // No input required, run directly
-      executeCodeDirectly(turboMode, '');
+      executeCodeDirectly(turboMode, '', cleanedCode);
     }
   };
 
   // Handle execution with provided input
   const handleExecuteWithInput = (input) => {
     if (pendingExecution) {
-      executeCodeDirectly(pendingExecution.turboMode, input);
+      executeCodeDirectly(pendingExecution.turboMode, input, pendingExecution.cleanedCode);
       setPendingExecution(null);
     }
   };
 
   // Main execution function
-  const executeCodeDirectly = async (turboMode = false, input = '') => {
-    let sourceCode = '';
+  const executeCodeDirectly = async (turboMode = false, input = '', cleanedCode = '') => {
+    let sourceCode = cleanedCode;
     
-    // Multiple ways to get the code
-    if (editorRef.current?.getValue) {
-      sourceCode = editorRef.current.getValue();
-    } else if (editorRef.current?.editor?.getValue) {
-      sourceCode = editorRef.current.editor.getValue();
-    } else if (editorRef.current) {
-      sourceCode = editorRef.current;
-    } else {
-      sourceCode = localStorage.getItem('currentCode') || '';
+    if (!sourceCode) {
+      sourceCode = getCurrentCode();
+      // Clean the code again as fallback
+      sourceCode = cleanCodeForExecution(sourceCode, language);
     }
 
-    if (!sourceCode) return;
+    if (!sourceCode) {
+      toast({
+        title: "No code to execute",
+        description: "Please write some code first",
+        status: "error",
+        duration: 3000,
+        position: "top-right"
+      });
+      return;
+    }
     
     setIsLoading(true);
     setError(null);
     setCompilerStatus('connecting');
     const startTime = performance.now();
+    
+    // Increment execution counter
+    executionCountRef.current += 1;
+    const currentExecutionId = executionCountRef.current;
+    
+    console.log(`▶️ Starting execution #${currentExecutionId} for ${language}`);
     
     // Show rocket mode notification
     if (turboMode) {
@@ -443,8 +782,20 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
         setCompilerStatus('success');
       }
       
-      // NEW: Auto-switch to appropriate tab
-      autoSwitchTab(result, finalOutput || finalError, !!finalError);
+      // ALWAYS show output in the currently active tab
+      setHasOutput(true);
+      
+      // Check if output has graphical data patterns
+      const hasGraphicalPatterns = checkForGraphicalData(finalOutput || finalError);
+      setHasGraphicalData(hasGraphicalPatterns);
+      
+      // Update execution result
+      setExecutionResult({
+        apiUsed: result.apiUsed || 'unknown',
+        executionTime,
+        success: !finalError,
+        hasGraphicalData: hasGraphicalPatterns
+      });
       
       setMetrics(prev => ({
         ...prev,
@@ -454,16 +805,8 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
         successRate: finalError ? 0 : 100
       }));
       
-      // Store execution result for graphical output
-      setExecutionResult({
-        apiUsed: result.apiUsed || 'unknown',
-        executionTime,
-        success: !finalError,
-        hasGraphicalData: checkForGraphicalData(finalOutput || finalError)
-      });
-      
     } catch (error) {
-      console.error('Execution error:', error);
+      console.error('❌ Execution error:', error);
       const errorMessage = error.message || "Execution failed";
       setError(errorMessage);
       
@@ -490,8 +833,8 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
         });
       }
       
-      // NEW: Auto-switch to Problems tab for errors
-      autoSwitchTab(null, errorMessage, true);
+      // ALWAYS show output in the currently active tab
+      setHasOutput(true);
       
       setMetrics(prev => ({ ...prev, successRate: 0 }));
       setCompilerStatus('error');
@@ -537,6 +880,7 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
     setHasOutput(false);
     setHasGraphicalData(false);
     setActiveTab(0); // Reset to Console tab
+    setLanguageWarning(null);
   };
 
   const copyOutput = () => {
@@ -559,6 +903,23 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
     a.download = `output_${new Date().toISOString()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // Handle language warning actions
+  const handleClearEditor = () => {
+    setEditorCode('');
+    setLanguageWarning(null);
+    toast({
+      title: "Editor Cleared",
+      description: "Incompatible code has been removed",
+      status: "info",
+      duration: 2000,
+      position: "top-right"
+    });
+  };
+
+  const handleIgnoreWarning = () => {
+    setLanguageWarning(null);
   };
 
   // Check input requirements for ALL languages
@@ -615,6 +976,19 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
     return inputInfo[language] || { method: 'input function', example: 'Check language documentation' };
   };
 
+  // Get API badge information
+  const getApiBadgeInfo = () => {
+    const apiInfo = getApiInfo();
+    switch (apiInfo.type) {
+      case 'backend':
+        return { color: 'green', text: 'CoderPoint Cloud' };
+      case 'piston':
+        return { color: 'blue', text: 'Piston' };
+      default:
+        return { color: 'gray', text: 'Unknown API' };
+    }
+  };
+
   // If preview mode is active and HTML files exist, show PreviewMode component
   if (showPreview && hasHTMLFile) {
     return (
@@ -628,6 +1002,7 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
   }
 
   const languageInputInfo = getLanguageInputInfo();
+  const apiBadgeInfo = getApiBadgeInfo();
 
   return (
     <MotionBox
@@ -686,9 +1061,16 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
                   variant="solid"
                   fontSize="xs"
                 >
-                  {language.toUpperCase()}
+                  {getLanguageDisplayName(language)}
                 </Badge>
               )}
+              <Badge
+                colorScheme={apiBadgeInfo.color}
+                variant="subtle"
+                fontSize="xs"
+              >
+                {apiBadgeInfo.text}
+              </Badge>
               {hasInputRequirements && (
                 <Badge
                   colorScheme="orange"
@@ -802,20 +1184,54 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
         </HStack>
       </Flex>
 
+      {/* Language Warning Alert */}
+      {languageWarning && (
+        <LanguageWarningAlert 
+          warning={languageWarning}
+          onClear={handleClearEditor}
+          onIgnore={handleIgnoreWarning}
+          colorMode={colorMode}
+        />
+      )}
+
+      {/* Language & API Info */}
+      <Box
+        px={4}
+        py={2}
+        bg={colorMode === 'dark' ? 'blue.900' : 'blue.100'}
+        borderBottom="1px solid"
+        borderColor={colorMode === 'dark' ? 'blue.700' : 'blue.200'}
+      >
+        <HStack spacing={3} justify="space-between">
+          <HStack spacing={3}>
+            <Badge colorScheme="blue" fontSize="xs">
+              ACTIVE LANGUAGE
+            </Badge>
+            <Text fontSize="xs" color={colorMode === 'dark' ? 'blue.300' : 'blue.700'}>
+              {getLanguageDisplayName(language)} • {getApiInfo().name}
+            </Text>
+          </HStack>
+          <Text fontSize="xs" color={colorMode === 'dark' ? 'blue.300' : 'blue.700'}>
+            CoderPoint Cloud: {getApiInfo().supportsBackend ? '✅' : '❌'} • 
+            Piston: {getApiInfo().supportsPiston ? '✅' : '❌'}
+          </Text>
+        </HStack>
+      </Box>
+
       {/* Input Status */}
       {userInput && (
         <Box
           px={4}
           py={2}
-          bg={colorMode === 'dark' ? 'blue.900' : 'blue.100'}
+          bg={colorMode === 'dark' ? 'green.900' : 'green.100'}
           borderBottom="1px solid"
-          borderColor={colorMode === 'dark' ? 'blue.700' : 'blue.200'}
+          borderColor={colorMode === 'dark' ? 'green.700' : 'green.200'}
         >
           <HStack spacing={2}>
-            <Badge colorScheme="blue" fontSize="xs">
+            <Badge colorScheme="green" fontSize="xs">
               INPUT ACTIVE
             </Badge>
-            <Text fontSize="xs" color={colorMode === 'dark' ? 'blue.300' : 'blue.700'}>
+            <Text fontSize="xs" color={colorMode === 'dark' ? 'green.300' : 'green.700'}>
               Using provided input: {userInput.split('\n').map((line, i) => `"${line}"`).join(', ')}
             </Text>
             <IconButton
@@ -824,7 +1240,7 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
               variant="ghost"
               onClick={() => setUserInput('')}
               aria-label="Clear input"
-              colorScheme="blue"
+              colorScheme="green"
             />
           </HStack>
         </Box>
@@ -855,82 +1271,80 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
 
       {/* Metrics Bar */}
       {(metrics.executionTime > 0 || isLoading) && (
-        <MotionBox
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: "auto", opacity: 1 }}
-          transition={{ duration: 0.3 }}
+        <Box
           px={4}
           py={2}
-          bg={isRocketMode ? 
-            `linear-gradient(135deg, ${colorMode === 'dark' ? 'rgba(249, 146, 38, 0.1)' : 'rgba(249, 146, 38, 0.05)'}, ${colorMode === 'dark' ? 'rgba(10, 14, 39, 0.3)' : 'rgba(248, 250, 252, 0.5)'})` :
-            (colorMode === 'dark' ? 'rgba(10, 14, 39, 0.3)' : 'rgba(248, 250, 252, 0.5)')
-          }
           borderBottom="1px solid"
-          borderColor={colorMode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'}
+          borderColor={colorMode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}
         >
           <Grid templateColumns="repeat(4, 1fr)" gap={4}>
             <GridItem>
               <HStack spacing={2}>
-                <FaClock size={12} color={colorMode === 'dark' ? '#a78bfa' : '#7c3aed'} />
+                <FaClock color={colorMode === 'dark' ? '#60a5fa' : '#2563eb'} />
                 <VStack align="start" spacing={0}>
                   <Text fontSize="xs" color={colorMode === 'dark' ? 'gray.400' : 'gray.600'}>
-                    Execution {isRocketMode && "🚀"}
+                    Time
                   </Text>
-                  <Text fontSize="sm" fontWeight="bold" color={isRocketMode ? 'orange.400' : 'inherit'}>
-                    {metrics.executionTime}ms
+                  <Text fontSize="sm" fontWeight="bold">
+                    {isLoading ? '...' : `${metrics.executionTime}ms`}
                   </Text>
                 </VStack>
               </HStack>
             </GridItem>
-            
             <GridItem>
               <HStack spacing={2}>
-                <FaMemory size={12} color={colorMode === 'dark' ? '#60a5fa' : '#3b82f6'} />
+                <FaMemory color={colorMode === 'dark' ? '#34d399' : '#059669'} />
                 <VStack align="start" spacing={0}>
                   <Text fontSize="xs" color={colorMode === 'dark' ? 'gray.400' : 'gray.600'}>
                     Memory
                   </Text>
                   <Text fontSize="sm" fontWeight="bold">
-                    {metrics.memoryUsage}MB
+                    {isLoading ? '...' : `${metrics.memoryUsage}MB`}
                   </Text>
                 </VStack>
               </HStack>
             </GridItem>
-            
             <GridItem>
               <HStack spacing={2}>
-                <Box w={3} h={3} borderRadius="full" 
-                  bg={metrics.successRate === 100 ? 'green.400' : 'red.400'} 
-                />
+                <FaChartLine color={colorMode === 'dark' ? '#f59e0b' : '#d97706'} />
                 <VStack align="start" spacing={0}>
                   <Text fontSize="xs" color={colorMode === 'dark' ? 'gray.400' : 'gray.600'}>
-                    Status
+                    CPU
                   </Text>
                   <Text fontSize="sm" fontWeight="bold">
-                    {metrics.successRate === 100 ? 'Success' : 'Failed'}
+                    {isLoading ? '...' : `${metrics.cpuUsage}%`}
                   </Text>
                 </VStack>
               </HStack>
             </GridItem>
-            
             <GridItem>
-              <Progress 
-                value={metrics.cpuUsage} 
-                size="sm" 
-                colorScheme="purple" 
-                borderRadius="full"
-                hasStripe
-                isAnimated
-              />
-              <Text fontSize="xs" color={colorMode === 'dark' ? 'gray.400' : 'gray.600'} mt={1}>
-                CPU: {metrics.cpuUsage}%
-              </Text>
+              <HStack spacing={2}>
+                <FaCheckCircle color={colorMode === 'dark' ? '#10b981' : '#059669'} />
+                <VStack align="start" spacing={0}>
+                  <Text fontSize="xs" color={colorMode === 'dark' ? 'gray.400' : 'gray.600'}>
+                    Success
+                  </Text>
+                  <Text fontSize="sm" fontWeight="bold">
+                    {isLoading ? '...' : `${metrics.successRate}%`}
+                  </Text>
+                </VStack>
+              </HStack>
             </GridItem>
           </Grid>
-        </MotionBox>
+        </Box>
       )}
 
-      {/* Main Content Area */}
+      {/* Loading Progress */}
+      {isLoading && (
+        <Progress
+          size="xs"
+          isIndeterminate
+          colorScheme="purple"
+          bg="transparent"
+        />
+      )}
+
+      {/* Main Content Area with 3D Tabs */}
       <Box flex={1} overflow="hidden">
         <Tabs 
           colorScheme="purple" 
@@ -940,60 +1354,51 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
           flexDirection="column"
           index={activeTab}
           onChange={setActiveTab}
+          variant="unstyled"
         >
-          <TabList px={4} borderBottom="1px solid" 
+          <TabList 
+            px={4} 
+            pt={3}
+            pb={2}
+            borderBottom="1px solid" 
             borderColor={colorMode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}
+            gap={2}
           >
-            <Tab>
-              <HStack spacing={2}>
-                <FaTerminal />
-                <Text>Console</Text>
-                {logs.length > 0 && (
-                  <Badge colorScheme="purple" fontSize="xs" borderRadius="full" minW="5">
-                    {logs.length}
-                  </Badge>
-                )}
-              </HStack>
-            </Tab>
-            <Tab>
-              <HStack spacing={2}>
-                <FaCode />
-                <Text>Output</Text>
-                {output && (
-                  <Badge colorScheme="green" fontSize="xs" borderRadius="full" minW="5">
-                    ✓
-                  </Badge>
-                )}
-              </HStack>
-            </Tab>
-            <Tab>
-              <HStack spacing={2}>
-                <FaChartLine />
-                <Text>Graphical</Text>
-                {hasGraphicalData && (
-                  <Badge colorScheme="blue" fontSize="xs" borderRadius="full" minW="5">
-                    📊
-                  </Badge>
-                )}
-              </HStack>
-            </Tab>
-            <Tab>
-              <HStack spacing={2}>
-                <FaExclamationTriangle />
-                <Text>Problems</Text>
-                {error && (
-                  <Badge colorScheme="red" fontSize="xs" borderRadius="full" minW="5">
-                    !
-                  </Badge>
-                )}
-              </HStack>
-            </Tab>
-            <Tab>
-              <HStack spacing={2}>
-                <FaTerminal />
-                <Text>Terminal</Text>
-              </HStack>
-            </Tab>
+            {['Console', 'Output', 'Graphical', 'Problems', 'Terminal'].map((tabName, index) => (
+              <Tab key={tabName} as={MotionBox} p={0} _selected={{}} _hover={{}}>
+                <ModernTab isSelected={activeTab === index}>
+                  <HStack spacing={2}>
+                    {index === 0 && <FaTerminal size={12} />}
+                    {index === 1 && <FaCode size={12} />}
+                    {index === 2 && <FaChartLine size={12} />}
+                    {index === 3 && <FaExclamationTriangle size={12} />}
+                    {index === 4 && <FaTerminal size={12} />}
+                    <Text fontSize="sm" fontWeight="medium">{tabName}</Text>
+                    {index === 0 && logs.length > 0 && (
+                      <Badge colorScheme="purple" fontSize="xs" borderRadius="full" minW="5">
+                        {logs.length}
+                      </Badge>
+                    )}
+                    {index === 1 && output && (
+                      <Badge colorScheme="green" fontSize="xs" borderRadius="full" minW="5">
+                        ✓
+                      </Badge>
+                    )}
+                    {index === 2 && hasGraphicalData && (
+                      <Badge colorScheme="blue" fontSize="xs" borderRadius="full" minW="5">
+                        📊
+                      </Badge>
+                    )}
+                    {index === 3 && error && (
+                      <Badge colorScheme="red" fontSize="xs" borderRadius="full" minW="5">
+                        !
+                      </Badge>
+                    )}
+                  </HStack>
+                </ModernTab>
+              </Tab>
+            ))}
+            
             <Flex flex={1} justify="flex-end" align="center">
               <HStack spacing={2}>
                 <Tooltip label="Clear Console">
@@ -1074,7 +1479,7 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
               )}
             </TabPanel>
 
-            {/* Output Tab */}
+            {/* Output Tab - ALWAYS show output here when active */}
             <TabPanel p={4}>
               <VStack align="stretch" spacing={4}>
                 {/* API Response Details */}
@@ -1173,7 +1578,7 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
                 language={language}
                 isLoading={isLoading}
                 executionData={executionResult}
-                code={editorRef.current?.getValue() || ''}
+                code={getCurrentCode()}
               />
             </TabPanel>
 
@@ -1211,6 +1616,22 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
                       <Code fontSize="xs" bg="transparent" mt={1}>
                         {languageInputInfo.example}
                       </Code>
+                    </VStack>
+                  </HStack>
+                ) : languageWarning ? (
+                  <HStack 
+                    p={3} 
+                    bg="rgba(245, 158, 11, 0.1)" 
+                    borderRadius="md"
+                    borderLeft="3px solid"
+                    borderColor="orange.500"
+                  >
+                    <FaExclamationCircle color="#f59e0b" />
+                    <VStack align="start" flex={1} spacing={1}>
+                      <Text fontWeight="bold" fontSize="sm">Language Compatibility Issue</Text>
+                      <Text fontSize="sm">
+                        {languageWarning}
+                      </Text>
                     </VStack>
                   </HStack>
                 ) : (
@@ -1327,7 +1748,7 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
               language={language}
               isLoading={isLoading}
               executionData={executionResult}
-              code={editorRef.current?.getValue() || ''}
+              code={getCurrentCode()}
             />
           </ModalBody>
         </ModalContent>
@@ -1339,7 +1760,7 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
         onClose={onClose}
         onExecute={handleExecuteWithInput}
         language={language}
-        code={editorRef.current?.getValue()}
+        code={getCurrentCode()}
         isLoading={isLoading}
         inputFields={inputFields}
       />

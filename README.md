@@ -72,7 +72,7 @@ online_code_editor/
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/smshagor-dev/CoderPoint.git
+git clone https://github.com/smshagor-dev/
 cd online_code_editor
 ```
 

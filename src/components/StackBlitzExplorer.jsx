@@ -161,7 +161,8 @@ const getFileIcon = (filename, isFolder, isOpen, colorMode) => {
   return <FaFile color={fileColor} size={iconSize} />;
 };
 
-// File Tree Node Component - maintaining original structure
+// File Tree Node Component - Updated with download functionality and folder navigation
+// Fixed File Tree Node Component - Click anywhere on folder row to open/close
 const FileTreeNode = ({
   node,
   level = 0,
@@ -176,7 +177,8 @@ const FileTreeNode = ({
   onDragOver,
   onDrop,
   copiedNode,
-  cutNode
+  cutNode,
+  onDownload
 }) => {
   const { colorMode } = useColorMode();
   const [isHovered, setIsHovered] = useState(false);
@@ -212,6 +214,30 @@ const FileTreeNode = ({
     }
   };
 
+  // Handle click on the entire row
+  const handleRowClick = (e) => {
+    if (node.type === FILE_TYPES.FOLDER) {
+      // Toggle folder open/close when clicking anywhere on the row
+      onToggle(node.id);
+    } else {
+      // Select file when clicking on file row
+      onSelect(node.id);
+    }
+  };
+
+  // Handle click specifically on the toggle icon (to prevent double-toggle)
+  const handleIconClick = (e) => {
+    e.stopPropagation(); // Prevent the row click from also firing
+    if (node.type === FILE_TYPES.FOLDER) {
+      onToggle(node.id);
+    }
+  };
+
+  const handleDownloadClick = (e) => {
+    e.stopPropagation(); // Prevent the row click from firing
+    onDownload(node);
+  };
+
   const isCopied = copiedNode && copiedNode.id === node.id;
   const isCut = cutNode && cutNode.id === node.id;
 
@@ -233,13 +259,7 @@ const FileTreeNode = ({
         borderLeft={selectedId === node.id ? '2px solid' : '2px solid transparent'}
         borderColor={isCopied ? 'blue.400' : selectedId === node.id ? 'purple.400' : 'transparent'}
         cursor="pointer"
-        onClick={() => {
-          if (node.type === FILE_TYPES.FOLDER) {
-            onToggle(node.id);
-          } else {
-            onSelect(node.id);
-          }
-        }}
+        onClick={handleRowClick}
         onContextMenu={(e) => onContextMenu(e, node)}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -254,15 +274,13 @@ const FileTreeNode = ({
         border={isCopied ? '1px dashed' : 'none'}
       >
         {node.type === FILE_TYPES.FOLDER && (
-          <Box
-            onClick={(e) => e.stopPropagation()}
-          >
+          <Box onClick={handleIconClick}>
             <IconButton
               icon={node.isOpen ? <ChevronDownIcon /> : <ChevronRightIcon />}
               size="xs"
               variant="ghost"
-              onClick={() => onToggle(node.id)}
-              aria-label="Toggle folder"
+              onClick={handleIconClick}
+              aria-label={node.isOpen ? "Collapse folder" : "Expand folder"}
               minW="16px"
               h="16px"
             />
@@ -273,21 +291,42 @@ const FileTreeNode = ({
           <Box ml="16px" />
         )}
 
-        <Box>
-          {getFileIcon(node.name, node.type === FILE_TYPES.FOLDER, node.isOpen, colorMode)}
+        <Box
+          flex={1}
+          display="flex"
+          alignItems="center"
+          // Remove onClick here since the entire row already has it
+        >
+          <Box mr={2}>
+            {getFileIcon(node.name, node.type === FILE_TYPES.FOLDER, node.isOpen, colorMode)}
+          </Box>
+
+          <Text
+            fontSize="13px"
+            flex={1}
+            color={colorMode === 'dark' ? 'gray.200' : 'gray.700'}
+            fontFamily="'SF Mono', Monaco, monospace"
+            noOfLines={1}
+          >
+            {node.name}
+            {isCut && " (moving)"}
+            {isCopied && " (copied)"}
+          </Text>
         </Box>
 
-        <Text
-          fontSize="13px"
-          flex={1}
-          color={colorMode === 'dark' ? 'gray.200' : 'gray.700'}
-          fontFamily="'SF Mono', Monaco, monospace"
-          noOfLines={1}
-        >
-          {node.name}
-          {isCut && " (moving)"}
-          {isCopied && " (copied)"}
-        </Text>
+        {/* Download button that appears on hover */}
+        {isHovered && (
+          <Tooltip label={`Download ${node.type === FILE_TYPES.FILE ? 'File' : 'Folder'}`}>
+            <IconButton
+              icon={<FaDownload size={10} />}
+              size="xs"
+              variant="ghost"
+              onClick={handleDownloadClick}
+              aria-label={`Download ${node.name}`}
+              color="green.500"
+            />
+          </Tooltip>
+        )}
 
         {node.type === FILE_TYPES.FOLDER && node.children && (
           <Badge
@@ -309,7 +348,7 @@ const FileTreeNode = ({
       </HStack>
 
       {node.type === FILE_TYPES.FOLDER && node.isOpen && node.children && (
-        <Collapse in={node.isOpen} animateOpacity>
+        <Box>
           <VStack align="stretch" spacing={0}>
             {sortFileSystemNodes(node.children).map(child => (
               <FileTreeNode
@@ -328,10 +367,11 @@ const FileTreeNode = ({
                 onDrop={onDrop}
                 copiedNode={copiedNode}
                 cutNode={cutNode}
+                onDownload={onDownload}
               />
             ))}
           </VStack>
-        </Collapse>
+        </Box>
       )}
     </Box>
   );
@@ -370,10 +410,17 @@ const FILE_TYPE_OPTIONS = [
   { value: 'sh', label: 'Shell Script (.sh)' }
 ];
 
-// Cloud File Operations - Enhanced with all upload methods
+// Cloud File Operations - Fixed with better error handling
 class CloudFileManager {
   constructor() {
     this.apiUrl = 'https://cloud.coderpoint.ru/api/files.php';
+  }
+
+  async searchFiles(query, fileType = '') {
+    return this.makeRequest('search', {
+      query,
+      file_type: fileType
+    });
   }
 
   async makeRequest(action, data = {}) {
@@ -386,6 +433,7 @@ class CloudFileManager {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
         action,
@@ -401,6 +449,7 @@ class CloudFileManager {
     try {
       result = JSON.parse(cleanResponse);
     } catch (error) {
+      console.error('JSON parse error:', cleanResponse);
       throw new Error('Invalid server response');
     }
 
@@ -421,54 +470,56 @@ class CloudFileManager {
     return this.makeRequest('list', { path });
   }
 
-  // Create a file
+  // Create a file with better path handling
   async createFile(filename, content = '', path = '') {
+    // Clean and normalize the path
+    const cleanPath = path ? path.replace(/^\/+/, '').replace(/\/+$/, '') : '';
+    
     return this.makeRequest('create', {
       filename,
       content,
-      path
+      path: cleanPath
     });
   }
 
   // Create a directory
   async createDirectory(dirname, path = '') {
+    const cleanPath = path ? path.replace(/^\/+/, '').replace(/\/+$/, '') : '';
+    
     return this.makeRequest('mkdir', {
       dirname,
-      path
+      path: cleanPath
     });
   }
 
   // Read file content
   async readFile(filepath) {
+    const cleanPath = filepath.replace(/^\/+/, '').replace(/\/+$/, '');
     return this.makeRequest('read', {
-      filepath
+      filepath: cleanPath
     });
   }
 
   // Write/update file content
   async writeFile(filepath, content) {
+    const cleanPath = filepath.replace(/^\/+/, '').replace(/\/+$/, '');
     return this.makeRequest('write', {
-      filepath,
+      filepath: cleanPath,
       content
     });
   }
 
   // Delete file or directory
   async deleteFile(filepath) {
+    const cleanPath = filepath.replace(/^\/+/, '').replace(/\/+$/, '');
     return this.makeRequest('delete', {
-      filepath
+      filepath: cleanPath
     });
   }
 
-  // Search files
-  async searchFiles(query, fileType = '') {
-    return this.makeRequest('search', {
-      query,
-      file_type: fileType
-    });
-  }
 
-  // Upload single file to cloud
+
+  // Upload single file to cloud using FormData
   async uploadFile(file, path = '') {
     const token = localStorage.getItem('auth_token');
     const formData = new FormData();
@@ -493,62 +544,6 @@ class CloudFileManager {
     }
 
     return result;
-  }
-
-  // Upload multiple files to cloud (folder upload)
-  async uploadMultipleFiles(files, path = '') {
-    const token = localStorage.getItem('auth_token');
-    const uploadPromises = [];
-
-    for (const file of files) {
-      const formData = new FormData();
-      formData.append('action', 'upload');
-      formData.append('token', token);
-      formData.append('file', file);
-      if (path) {
-        formData.append('path', path);
-      }
-
-      uploadPromises.push(
-        fetch(this.apiUrl, {
-          method: 'POST',
-          body: formData
-        }).then(async response => {
-          const responseText = await response.text();
-          const cleanResponse = cleanApiResponse(responseText);
-          const result = JSON.parse(cleanResponse);
-          
-          if (!result.success) {
-            throw new Error(`Failed to upload ${file.name}: ${result.error}`);
-          }
-          
-          return result;
-        })
-      );
-    }
-
-    return Promise.all(uploadPromises);
-  }
-
-  // Upload all files from local file system to cloud
-  async uploadAllFiles(fileSystem, path = '') {
-    if (!fileSystem || !fileSystem.getAllFiles) {
-      throw new Error('File system not available');
-    }
-
-    const allFiles = fileSystem.getAllFiles();
-    const uploadPromises = [];
-
-    for (const file of allFiles) {
-      const filePath = file.getPath ? file.getPath() : '';
-      const fullPath = path ? `${path}/${filePath}` : filePath;
-      
-      uploadPromises.push(
-        this.createFile(file.name, file.content || '', fullPath)
-      );
-    }
-
-    return Promise.all(uploadPromises);
   }
 }
 
@@ -662,6 +657,101 @@ export const StackBlitzExplorer = ({
     }
   }, [user]);
 
+  // Download Functions
+  const handleFileDownload = (node) => {
+    if (node.type === FILE_TYPES.FILE) {
+      const blob = new Blob([node.content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = node.name;
+      link.click();
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "File downloaded",
+        description: `${node.name} has been downloaded`,
+        status: "success",
+        duration: 2000
+      });
+    }
+  };
+
+  const handleFolderDownload = async (node) => {
+    try {
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+      
+      // Recursive function to add files to ZIP
+      const addFilesToZip = (folderNode, zipFolder, path = '') => {
+        if (folderNode.children) {
+          folderNode.children.forEach(child => {
+            const currentPath = path ? `${path}/${child.name}` : child.name;
+            
+            if (child.type === FILE_TYPES.FILE) {
+              zipFolder.file(currentPath, child.content);
+            } else if (child.type === FILE_TYPES.FOLDER) {
+              const newFolder = zipFolder.folder(child.name);
+              addFilesToZip(child, newFolder, '');
+            }
+          });
+        }
+      };
+      
+      if (node.type === FILE_TYPES.FOLDER) {
+        addFilesToZip(node, zip, '');
+        
+        const zipContent = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(zipContent);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${node.name}.zip`;
+        link.click();
+        URL.revokeObjectURL(url);
+        
+        toast({
+          title: "Folder downloaded",
+          description: `${node.name} has been downloaded as ZIP`,
+          status: "success",
+          duration: 2000
+        });
+      }
+    } catch (error) {
+      console.error('Error creating ZIP:', error);
+      toast({
+        title: "Download failed",
+        description: "Failed to download folder as ZIP",
+        status: "error",
+        duration: 3000
+      });
+      throw error;
+    }
+  };
+
+  const handleDownload = async (node) => {
+    if (node.type === FILE_TYPES.FILE) {
+      handleFileDownload(node);
+    } else if (node.type === FILE_TYPES.FOLDER) {
+      // Show loading state for folder download
+      setIsCloudLoading(true);
+      setCurrentUploadFile(`Preparing ${node.name} for download...`);
+      
+      try {
+        await handleFolderDownload(node);
+      } catch (error) {
+        toast({
+          title: "Download failed",
+          description: error.message,
+          status: "error",
+          duration: 3000
+        });
+      } finally {
+        setIsCloudLoading(false);
+        setCurrentUploadFile('');
+      }
+    }
+  };
+
   const checkAuthStatus = async () => {
     const token = localStorage.getItem('auth_token');
     if (token) {
@@ -744,40 +834,39 @@ export const StackBlitzExplorer = ({
   const fetchFileStats = async () => {
     const token = localStorage.getItem('auth_token');
     if (!token) return;
-
+  
     try {
-      const response = await fetch('https://cloud.coderpoint.ru/api/files.php', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'stats',
-          token: token
-        })
-      });
+      setIsAuthLoading(true);
       
-      const responseText = await response.text();
-      const cleanResponse = cleanApiResponse(responseText);
-      let result;
+      // Use the cloudFileManager instead of direct fetch
+      const result = await cloudFileManager.getStats();
       
-      try {
-        result = JSON.parse(cleanResponse);
-      } catch (parseError) {
-        console.error('Failed to parse file stats response:', cleanResponse);
-        return;
-      }
-      
-      if (result.success) {
+      if (result.success && result.stats) {
         setFileStats(result.stats);
         console.log('File stats loaded:', result.stats);
+      } else {
+        console.error('Failed to load file stats:', result.error);
+        toast({
+          title: "Stats load failed",
+          description: result.error || "Failed to load file statistics",
+          status: "error",
+          duration: 3000,
+        });
       }
     } catch (error) {
       console.error('File stats fetch failed:', error);
+      toast({
+        title: "Stats error",
+        description: "Failed to load file statistics",
+        status: "error",
+        duration: 3000,
+      });
+    } finally {
+      setIsAuthLoading(false);
     }
   };
 
-  // Cloud Operations Functions
+  // Cloud Operations Functions - FIXED VERSION
   const getCloudStats = async () => {
     try {
       const result = await cloudFileManager.getStats();
@@ -789,16 +878,16 @@ export const StackBlitzExplorer = ({
     }
   };
 
-  // Enhanced Cloud Upload Functions - All three types
+  // Enhanced Cloud Upload Functions - Fixed path handling
   const handleSingleFileUploadToCloud = async (file, targetPath = '') => {
     if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to upload files to cloud",
-        status: "warning",
-        duration: 3000,
-      });
-      return;
+        toast({
+            title: "Authentication required",
+            description: "Please sign in to upload files to cloud",
+            status: "warning",
+            duration: 3000,
+        });
+        return false;
     }
 
     setIsCloudLoading(true);
@@ -806,115 +895,179 @@ export const StackBlitzExplorer = ({
     setCurrentUploadFile(file.name);
 
     try {
-      // Simulate progress for better UX
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90;
-          }
-          return prev + 10;
+        // Get target path from context menu or use empty for root
+        const targetFolder = contextMenu?.node || fileSystem?.root;
+        let cloudPath = '';
+        
+        if (targetFolder && targetFolder.type === FILE_TYPES.FOLDER && targetFolder !== fileSystem.root) {
+            if (targetFolder.getPath) {
+                cloudPath = targetFolder.getPath();
+            } else {
+                cloudPath = targetFolder.name;
+            }
+        }
+        
+        // Override with explicit target path if provided
+        if (targetPath) {
+            cloudPath = targetPath;
+        }
+
+        console.log('Uploading file to cloud:', {
+            name: file.name,
+            targetPath: cloudPath,
+            size: file.size,
+            type: file.type
         });
-      }, 200);
 
-      await cloudFileManager.uploadFile(file, targetPath);
-      
-      clearInterval(progressInterval);
-      setUploadProgress(100);
+        // Use FormData for file upload
+        const token = localStorage.getItem('auth_token');
+        const formData = new FormData();
+        formData.append('action', 'upload');
+        formData.append('token', token);
+        formData.append('file', file);
+        
+        // Clean and normalize target path
+        const cleanTargetPath = cloudPath ? cloudPath.replace(/^\/+/, '').replace(/\/+$/, '') : '';
+        if (cleanTargetPath) {
+            formData.append('path', cleanTargetPath);
+        }
 
-      // Update cloud stats
-      await getCloudStats();
+        // Simulate progress for better UX
+        const progressInterval = setInterval(() => {
+            setUploadProgress(prev => {
+                if (prev >= 90) {
+                    clearInterval(progressInterval);
+                    return 90;
+                }
+                return prev + 10;
+            });
+        }, 200);
 
-      toast({
-        title: "File uploaded to cloud",
-        description: `${file.name} uploaded successfully`,
-        status: "success",
-        duration: 3000,
-      });
-      
-      return true;
+        const response = await fetch(cloudFileManager.apiUrl, {
+            method: 'POST',
+            body: formData
+        });
+
+        const responseText = await response.text();
+        console.log('Upload response:', responseText);
+        
+        const cleanResponse = cleanApiResponse(responseText);
+        const result = JSON.parse(cleanResponse);
+
+        if (!result.success) {
+            throw new Error(result.error || 'Upload failed');
+        }
+
+        clearInterval(progressInterval);
+        setUploadProgress(100);
+
+        // Update cloud stats
+        await getCloudStats();
+
+        toast({
+            title: "File uploaded to cloud",
+            description: `${file.name} uploaded successfully`,
+            status: "success",
+            duration: 3000,
+        });
+        
+        return true;
     } catch (error) {
-      toast({
-        title: "Upload failed",
-        description: error.message,
-        status: "error",
-        duration: 3000,
-      });
-      return false;
+        console.error('Upload error:', error);
+        toast({
+            title: "Upload failed",
+            description: error.message,
+            status: "error",
+            duration: 3000,
+        });
+        return false;
     } finally {
-      setIsCloudLoading(false);
-      setUploadProgress(0);
-      setCurrentUploadFile('');
+        setIsCloudLoading(false);
+        setUploadProgress(0);
+        setCurrentUploadFile('');
     }
   };
 
   const handleFolderUploadToCloud = async (files, targetPath = '') => {
     if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to upload files to cloud",
-        status: "warning",
-        duration: 3000,
-      });
-      return;
-    }
-
-    if (!files || files.length === 0) {
-      toast({
-        title: "No files selected",
-        description: "Please select files to upload",
-        status: "warning",
-        duration: 3000,
-      });
-      return;
+        toast({
+            title: "Authentication required",
+            description: "Please sign in to upload files to cloud",
+            status: "warning",
+            duration: 3000,
+        });
+        return false;
     }
 
     setIsCloudLoading(true);
     setUploadProgress(0);
 
     try {
-      let uploadedCount = 0;
-      const totalFiles = files.length;
-
-      // Upload files sequentially to show progress
-      for (const file of files) {
-        setCurrentUploadFile(file.name);
+        const targetFolder = contextMenu?.node || fileSystem?.root;
+        let cloudPath = '';
         
-        try {
-          await cloudFileManager.uploadFile(file, targetPath);
-          uploadedCount++;
-          
-          // Update progress
-          setUploadProgress(Math.round((uploadedCount / totalFiles) * 100));
-          
-        } catch (error) {
-          console.error(`Failed to upload ${file.name}:`, error);
+        if (targetFolder && targetFolder.type === FILE_TYPES.FOLDER && targetFolder !== fileSystem.root) {
+            if (targetFolder.getPath) {
+                cloudPath = targetFolder.getPath();
+            } else {
+                cloudPath = targetFolder.name;
+            }
         }
-      }
+        
+        if (targetPath) {
+            cloudPath = targetPath;
+        }
 
-      // Update cloud stats
-      await getCloudStats();
+        let uploadedCount = 0;
+        const totalFiles = files.length;
 
-      toast({
-        title: "Folder uploaded to cloud",
-        description: `${uploadedCount}/${totalFiles} files uploaded successfully`,
-        status: "success",
-        duration: 3000,
-      });
-      
-      return true;
+        for (const file of files) {
+            try {
+                setCurrentUploadFile(file.name);
+                
+                console.log('Uploading file to cloud:', {
+                    name: file.name,
+                    targetPath: cloudPath,
+                    size: file.size
+                });
+
+                const success = await handleSingleFileUploadToCloud(file, cloudPath);
+                if (success) {
+                    uploadedCount++;
+                }
+                
+                // Update progress
+                setUploadProgress(Math.round((uploadedCount / totalFiles) * 100));
+                
+            } catch (error) {
+                console.error(`Failed to upload ${file.name}:`, error);
+                // Continue with other files even if one fails
+            }
+        }
+
+        // Update cloud stats
+        await getCloudStats();
+
+        toast({
+            title: "Files uploaded to cloud",
+            description: `${uploadedCount}/${totalFiles} files uploaded successfully`,
+            status: "success",
+            duration: 3000,
+        });
+        
+        return uploadedCount > 0;
     } catch (error) {
-      toast({
-        title: "Upload failed",
-        description: error.message,
-        status: "error",
-        duration: 3000,
-      });
-      return false;
+        toast({
+            title: "Upload failed",
+            description: error.message,
+            status: "error",
+            duration: 3000,
+        });
+        return false;
     } finally {
-      setIsCloudLoading(false);
-      setUploadProgress(0);
-      setCurrentUploadFile('');
+        setIsCloudLoading(false);
+        setUploadProgress(0);
+        setCurrentUploadFile('');
     }
   };
 
@@ -943,6 +1096,7 @@ export const StackBlitzExplorer = ({
     setUploadProgress(0);
 
     try {
+      // Get all files from the file system
       const allFiles = fileSystem.getAllFiles ? fileSystem.getAllFiles() : [];
       
       if (allFiles.length === 0) {
@@ -958,16 +1112,27 @@ export const StackBlitzExplorer = ({
       let uploadedCount = 0;
       const totalFiles = allFiles.length;
 
-      // Upload each file to cloud
+      // Clean and normalize target path
+      const cleanTargetPath = targetPath ? targetPath.replace(/^\/+/, '').replace(/\/+$/, '') : '';
+
+      // Upload each file to cloud using createFile API
       for (const file of allFiles) {
         try {
           setCurrentUploadFile(file.name);
           
-          // Get file path - adjust based on your file system structure
-          const filePath = file.path || '';
-          const fullPath = targetPath ? `${targetPath}/${filePath}`.replace('//', '/') : filePath;
+          console.log('Uploading file to cloud:', {
+            name: file.name,
+            targetPath: cleanTargetPath,
+            contentLength: file.content?.length || 0
+          });
+
+          // Use createFile API to create the file in cloud
+          await cloudFileManager.createFile(
+            file.name, 
+            file.content || '', 
+            cleanTargetPath
+          );
           
-          await cloudFileManager.createFile(file.name, file.content || '', fullPath);
           uploadedCount++;
           
           // Update progress
@@ -975,6 +1140,7 @@ export const StackBlitzExplorer = ({
           
         } catch (error) {
           console.error(`Failed to upload ${file.name}:`, error);
+          // Continue with other files even if one fails
         }
       }
 
@@ -988,7 +1154,7 @@ export const StackBlitzExplorer = ({
         duration: 3000,
       });
       
-      return true;
+      return uploadedCount > 0;
     } catch (error) {
       toast({
         title: "Upload failed",
@@ -1005,7 +1171,20 @@ export const StackBlitzExplorer = ({
   };
 
   const handleSaveToCloud = async () => {
-    const success = await handleAllFilesUploadToCloud();
+    // Get the target path from context menu or use empty for root
+    const targetFolder = contextMenu?.node || fileSystem?.root;
+    let targetPath = '';
+    
+    if (targetFolder && targetFolder.type === FILE_TYPES.FOLDER && targetFolder !== fileSystem.root) {
+      // Build the path for the folder
+      if (targetFolder.getPath) {
+        targetPath = targetFolder.getPath();
+      } else {
+        targetPath = targetFolder.name;
+      }
+    }
+    
+    const success = await handleAllFilesUploadToCloud(targetPath);
     if (success) {
       onCloudSaveClose();
     }
@@ -1127,91 +1306,83 @@ export const StackBlitzExplorer = ({
     const files = event.target.files;
     if (!files.length) return;
 
-    const targetFolder = contextMenu?.node || fileSystem?.root;
-    const cloudPath = targetFolder && targetFolder.type === FILE_TYPES.FOLDER ? 
-      (targetFolder.getPath ? targetFolder.getPath() : targetFolder.name) : '';
-
     try {
-      let success = false;
-      
-      if (uploadType === 'single') {
-        success = await handleSingleFileUploadToCloud(files[0], cloudPath);
-      } else if (uploadType === 'folder') {
-        success = await handleFolderUploadToCloud(Array.from(files), cloudPath);
-      } else if (uploadType === 'all') {
-        success = await handleAllFilesUploadToCloud(cloudPath);
-      }
-      
-      if (success) {
-        onCloudUploadClose();
-      }
+        let success = false;
+        
+        if (uploadType === 'single') {
+            success = await handleSingleFileUploadToCloud(files[0], targetPath);
+        } else if (uploadType === 'folder') {
+            // Handle multiple files
+            success = await handleFolderUploadToCloud(Array.from(files), targetPath);
+        } else if (uploadType === 'all') {
+            success = await handleAllFilesUploadToCloud(targetPath);
+        }
+        
+        if (success) {
+            onCloudUploadClose();
+        }
     } catch (error) {
-      console.error('Cloud upload failed:', error);
+        console.error('Cloud upload failed:', error);
     } finally {
-      event.target.value = '';
+        event.target.value = '';
     }
   };
 
   const handleFileSearch = async () => {
-    if (!fileSearchQuery.trim()) return;
-
-    const token = localStorage.getItem('auth_token');
-    if (!token) return;
-
-    try {
-      const response = await fetch('https://cloud.coderpoint.ru/api/files.php', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'search',
-          token: token,
-          query: fileSearchQuery
-        })
+    if (!fileSearchQuery.trim()) {
+      toast({
+        title: "Search query required",
+        description: "Please enter a search term",
+        status: "warning",
+        duration: 3000,
       });
-      
-      const responseText = await response.text();
-      const cleanResponse = cleanApiResponse(responseText);
-      let result;
-      
-      try {
-        result = JSON.parse(cleanResponse);
-      } catch (parseError) {
-        console.error('Failed to parse search response:', cleanResponse);
-        toast({
-          title: "Search failed",
-          description: "Invalid server response",
-          status: "error",
-          duration: 3000,
-        });
-        return;
-      }
+      return;
+    }
+  
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to search files",
+        status: "warning",
+        duration: 3000,
+      });
+      return;
+    }
+  
+    setIsAuthLoading(true);
+  
+    try {
+      // Use the cloudFileManager for search
+      const result = await cloudFileManager.searchFiles(fileSearchQuery);
       
       if (result.success) {
-        setSearchResults(result.results);
+        setSearchResults(result.results || []);
         toast({
           title: "Search completed",
-          description: `Found ${result.total} files`,
+          description: `Found ${result.total || 0} files`,
           status: "success",
           duration: 2000,
         });
       } else {
         toast({
           title: "Search failed",
-          description: result.error,
+          description: result.error || "Unknown error",
           status: "error",
           duration: 3000,
         });
+        setSearchResults([]);
       }
     } catch (error) {
       console.error('File search failed:', error);
       toast({
         title: "Search error",
-        description: "Failed to search files",
+        description: error.message || "Failed to search files",
         status: "error",
         duration: 3000,
       });
+      setSearchResults([]);
+    } finally {
+      setIsAuthLoading(false);
     }
   };
 
@@ -1933,28 +2104,42 @@ export const StackBlitzExplorer = ({
     </VStack>
   );
 
-  // Render File Stats Content - maintaining original
+  // Render File Stats Content - Fixed version
   const renderFileStatsContent = () => (
     <VStack spacing={4} align="stretch">
-      {fileStats ? (
+      {isAuthLoading ? (
+        <Box textAlign="center" py={8}>
+          <Spinner size="lg" mb={4} color="purple.500" />
+          <Text color="gray.500">Loading file statistics...</Text>
+        </Box>
+      ) : fileStats ? (
         <>
           <Grid templateColumns="repeat(3, 1fr)" gap={4}>
             <GridItem>
               <Stat p={3} bg={colorMode === 'dark' ? 'gray.700' : 'white'} borderRadius="md" boxShadow="sm">
                 <StatLabel>Total Files</StatLabel>
-                <StatNumber>{fileStats.total_files}</StatNumber>
+                <StatNumber>{fileStats.total_files || 0}</StatNumber>
+                <StatHelpText>
+                  Files in storage
+                </StatHelpText>
               </Stat>
             </GridItem>
             <GridItem>
               <Stat p={3} bg={colorMode === 'dark' ? 'gray.700' : 'white'} borderRadius="md" boxShadow="sm">
                 <StatLabel>Total Folders</StatLabel>
-                <StatNumber>{fileStats.total_folders}</StatNumber>
+                <StatNumber>{fileStats.total_folders || 0}</StatNumber>
+                <StatHelpText>
+                  Directories
+                </StatHelpText>
               </Stat>
             </GridItem>
             <GridItem>
               <Stat p={3} bg={colorMode === 'dark' ? 'gray.700' : 'white'} borderRadius="md" boxShadow="sm">
                 <StatLabel>Total Size</StatLabel>
-                <StatNumber>{formatFileSize(fileStats.total_size)}</StatNumber>
+                <StatNumber>{formatFileSize(fileStats.total_size || 0)}</StatNumber>
+                <StatHelpText>
+                  Storage used
+                </StatHelpText>
               </Stat>
             </GridItem>
           </Grid>
@@ -1963,12 +2148,12 @@ export const StackBlitzExplorer = ({
             <Box p={4} bg={colorMode === 'dark' ? 'gray.700' : 'white'} borderRadius="md" boxShadow="sm">
               <Text fontWeight="bold" mb={3}>File Types</Text>
               <VStack align="stretch" spacing={2}>
-                {fileStats.file_types.slice(0, 5).map((type, index) => (
+                {fileStats.file_types.slice(0, 8).map((type, index) => (
                   <HStack key={index} justify="space-between">
-                    <Badge colorScheme="blue">
+                    <Badge colorScheme="blue" fontSize="xs">
                       {type.file_type || 'directory'}
                     </Badge>
-                    <Text fontSize="sm">{type.type_count} files</Text>
+                    <Text fontSize="sm">{type.type_count || 0} files</Text>
                   </HStack>
                 ))}
               </VStack>
@@ -1985,98 +2170,145 @@ export const StackBlitzExplorer = ({
                       {file.filename}
                     </Text>
                     <Text fontSize="sm" color="gray.500">
-                      {formatFileSize(file.size)}
+                      {formatFileSize(file.size || 0)}
                     </Text>
                   </HStack>
                 ))}
               </VStack>
             </Box>
           )}
+
+          {/* Storage Usage Progress */}
+          <Box p={4} bg={colorMode === 'dark' ? 'gray.700' : 'white'} borderRadius="md" boxShadow="sm">
+            <Text fontWeight="bold" mb={2}>Storage Usage</Text>
+            <Progress 
+              value={fileStats.storage_limit > 0 ? (fileStats.total_size / fileStats.storage_limit) * 100 : 0}
+              colorScheme={fileStats.storage_limit > 0 && (fileStats.total_size / fileStats.storage_limit) > 0.9 ? "red" : "green"}
+              size="lg"
+              borderRadius="full"
+              mb={2}
+            />
+            <HStack justify="space-between">
+              <Text fontSize="sm">
+                {formatFileSize(fileStats.total_size || 0)} used
+              </Text>
+              <Text fontSize="sm">
+                {formatFileSize(fileStats.storage_limit || 0)} total
+              </Text>
+            </HStack>
+            {fileStats.storage_available !== undefined && (
+              <Text fontSize="sm" color="gray.500" mt={1}>
+                {formatFileSize(fileStats.storage_available)} available
+              </Text>
+            )}
+          </Box>
         </>
       ) : (
         <Box textAlign="center" py={8}>
-          <Spinner size="lg" mb={4} />
-          <Text>Loading file statistics...</Text>
+          <Text color="gray.500" mb={4}>No file statistics available</Text>
+          <Button 
+            colorScheme="purple" 
+            onClick={fetchFileStats}
+            isLoading={isAuthLoading}
+          >
+            Load File Stats
+          </Button>
         </Box>
       )}
     </VStack>
   );
 
-  // Render File Search Content - maintaining original
+  // Render File Search Content - Fixed version
   const renderFileSearchContent = () => (
     <VStack spacing={4} align="stretch">
-      <InputGroup>
-        <InputLeftElement>
-          <SearchIcon color="gray.400" />
-        </InputLeftElement>
-        <Input
-          placeholder="Search files by name..."
-          value={fileSearchQuery}
-          onChange={(e) => setFileSearchQuery(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleFileSearch()}
-        />
-      </InputGroup>
-
-      <Button
-        colorScheme="blue"
-        onClick={handleFileSearch}
-        isLoading={isAuthLoading}
-        leftIcon={<SearchIcon />}
-      >
-        Search Files
-      </Button>
-
-      {searchResults.length > 0 && (
-        <Box bg={colorMode === 'dark' ? 'gray.700' : 'white'} borderRadius="md" boxShadow="sm" overflow="hidden">
-          <Table variant="simple" size="sm">
-            <Thead bg={colorMode === 'dark' ? 'gray.600' : 'gray.50'}>
-              <Tr>
-                <Th>Name</Th>
-                <Th>Path</Th>
-                <Th isNumeric>Size</Th>
-                <Th>Type</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {searchResults.map((file, index) => (
-                <Tr key={index} _hover={{ bg: colorMode === 'dark' ? 'gray.600' : 'gray.50' }}>
-                  <Td>
-                    <HStack>
-                      {file.is_directory ? (
-                        <FaFolder color="#f59e0b" />
-                      ) : (
-                        <FaFile color="#718096" />
-                      )}
-                      <Text fontSize="sm">{file.filename}</Text>
-                    </HStack>
-                  </Td>
-                  <Td>
-                    <Code fontSize="xs" bg="transparent">
-                      {file.file_path}
-                    </Code>
-                  </Td>
-                  <Td isNumeric>
-                    <Text fontSize="sm">
-                      {formatFileSize(file.size)}
-                    </Text>
-                  </Td>
-                  <Td>
-                    <Badge colorScheme={file.is_directory ? "orange" : "blue"}>
-                      {file.is_directory ? "Folder" : file.file_type || "File"}
-                    </Badge>
-                  </Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </Table>
-        </Box>
-      )}
-
-      {fileSearchQuery && searchResults.length === 0 && !isAuthLoading && (
-        <Alert status="info" borderRadius="md">
+      {!user ? (
+        <Alert status="warning" borderRadius="md">
           <AlertIcon />
-          No files found matching "{fileSearchQuery}"
+          <Box>
+            <Text fontWeight="bold">Sign In Required</Text>
+            <Text fontSize="sm">Please sign in to search your cloud files</Text>
+          </Box>
         </Alert>
+      ) : (
+        <>
+          <InputGroup>
+            <InputLeftElement>
+              <SearchIcon color="gray.400" />
+            </InputLeftElement>
+            <Input
+              placeholder="Search files by name..."
+              value={fileSearchQuery}
+              onChange={(e) => setFileSearchQuery(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleFileSearch()}
+            />
+          </InputGroup>
+
+          <Button
+            colorScheme="blue"
+            onClick={handleFileSearch}
+            isLoading={isAuthLoading}
+            leftIcon={<SearchIcon />}
+            isDisabled={!fileSearchQuery.trim()}
+          >
+            Search Files
+          </Button>
+
+          {isAuthLoading ? (
+            <Box textAlign="center" py={4}>
+              <Spinner size="lg" mb={2} color="blue.500" />
+              <Text color="gray.500">Searching files...</Text>
+            </Box>
+          ) : searchResults.length > 0 ? (
+            <Box bg={colorMode === 'dark' ? 'gray.700' : 'white'} borderRadius="md" boxShadow="sm" overflow="hidden">
+              <Table variant="simple" size="sm">
+                <Thead bg={colorMode === 'dark' ? 'gray.600' : 'gray.50'}>
+                  <Tr>
+                    <Th>Name</Th>
+                    <Th>Path</Th>
+                    <Th isNumeric>Size</Th>
+                    <Th>Type</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {searchResults.map((file, index) => (
+                    <Tr key={index} _hover={{ bg: colorMode === 'dark' ? 'gray.600' : 'gray.50' }}>
+                      <Td>
+                        <HStack>
+                          {file.is_directory ? (
+                            <FaFolder color="#f59e0b" />
+                          ) : (
+                            <FaFile color="#718096" />
+                          )}
+                          <Text fontSize="sm">{file.filename}</Text>
+                        </HStack>
+                      </Td>
+                      <Td>
+                        <Code fontSize="xs" bg="transparent">
+                          {file.file_path}
+                        </Code>
+                      </Td>
+                      <Td isNumeric>
+                        <Text fontSize="sm">
+                          {formatFileSize(file.size || 0)}
+                        </Text>
+                      </Td>
+                      <Td>
+                        <Badge colorScheme={file.is_directory ? "orange" : "blue"}>
+                          {file.is_directory ? "Folder" : (file.file_type || "File")}
+                        </Badge>
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            </Box>
+          ) : fileSearchQuery && !isAuthLoading && (
+            <Alert status="info" borderRadius="md">
+              <AlertIcon />
+              No files found matching "{fileSearchQuery}"
+            </Alert>
+          )}
+        </>
       )}
     </VStack>
   );
@@ -2312,6 +2544,7 @@ export const StackBlitzExplorer = ({
             onDrop={handleDrop}
             copiedNode={copiedNode}
             cutNode={cutNode}
+            onDownload={handleDownload}
           />
         </Box>
 
@@ -2523,35 +2756,21 @@ export const StackBlitzExplorer = ({
                 Rename
               </Button>
 
-              <Divider my={1} />
-
+              {/* Download option in context menu */}
               <Button
                 variant="ghost"
                 size="sm"
                 justifyContent="flex-start"
                 leftIcon={<FaDownload size={12} />}
                 onClick={() => {
-                  if (contextMenu.node.type === FILE_TYPES.FILE) {
-                    const blob = new Blob([contextMenu.node.content], { type: 'text/plain' });
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = contextMenu.node.name;
-                    link.click();
-                    URL.revokeObjectURL(url);
-                    toast({
-                      title: "File downloaded",
-                      description: `${contextMenu.node.name} has been downloaded`,
-                      status: "success",
-                      duration: 2000
-                    });
-                  }
+                  handleDownload(contextMenu.node);
                   closeContextMenu();
                 }}
-                isDisabled={contextMenu.node.type === FILE_TYPES.FOLDER}
               >
-                Download
+                Download {contextMenu.node.type === FILE_TYPES.FILE ? 'File' : 'Folder'}
               </Button>
+
+              <Divider my={1} />
 
               {user && (
                 <>
@@ -2994,6 +3213,18 @@ export const StackBlitzExplorer = ({
                   </Tab>
                 </TabList>
 
+                {fileStats && (
+                  <Button 
+                    size="sm" 
+                    onClick={fetchFileStats}
+                    isLoading={isAuthLoading}
+                    leftIcon={<FaSyncAlt />}
+                    alignSelf="flex-start"
+                  >
+                    Refresh Stats
+                  </Button>
+                )}
+
                 <TabPanels>
                   <TabPanel>
                     {renderProfileContent()}
@@ -3049,21 +3280,21 @@ export const StackBlitzExplorer = ({
                 )}
 
                 {uploadType === 'folder' && (
-                  <Box width="100%">
-                    <Text mb={2}>Select multiple files (folder upload):</Text>
-                    <Button
-                      width="100%"
-                      leftIcon={<FaFolder />}
-                      onClick={() => cloudFolderUploadInputRef.current?.click()}
-                    >
-                      Choose Files
-                    </Button>
-                    {currentUploadFile && (
-                      <Text fontSize="sm" color="green.500" mt={2}>
-                        Uploading: {currentUploadFile}
-                      </Text>
-                    )}
-                  </Box>
+                    <Box width="100%">
+                        <Text mb={2}>Select multiple files (folder upload):</Text>
+                        <Button
+                            width="100%"
+                            leftIcon={<FaFolder />}
+                            onClick={() => cloudFolderUploadInputRef.current?.click()}
+                        >
+                            Choose Files
+                        </Button>
+                        {currentUploadFile && (
+                            <Text fontSize="sm" color="green.500" mt={2}>
+                                Selected: {currentUploadFile}
+                            </Text>
+                        )}
+                    </Box>
                 )}
 
                 {uploadType === 'all' && (
@@ -3219,4 +3450,3 @@ export const StackBlitzExplorer = ({
     </>
   );
 };
-

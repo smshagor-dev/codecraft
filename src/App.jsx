@@ -62,7 +62,7 @@ const CODE_TEMPLATES = {
     
     1. Clone the repo:
        \`\`\`bash
-       git clone https://github.com/smshagor-dev/CoderPoint.git
+       git clone https://github.com/smshagor-dev
        cd CoderPoint
        \`\`\`
     2. Open the frontend:
@@ -110,7 +110,7 @@ const CODE_TEMPLATES = {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=2.0">
+    <meta name="viewport" content="width=device-width, initial-scale=3.0">
     <title>My Awesome Page</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -309,7 +309,7 @@ console.log('🎉 Welcome to JavaScript!');
 
 // Variables and Data Types
 const name = 'CoderPoint';
-let version = 2.0;
+let version = 3.0;
 var isAwesome = true;
 
 // Array Operations
@@ -652,7 +652,7 @@ function App() {
               </Heading>
             </HStack>
             <Badge colorScheme="purple" variant="subtle">
-              v2.0
+              v3.0
             </Badge>
           </HStack>
 
@@ -663,7 +663,7 @@ function App() {
                 icon={<FaGithub />}
                 variant="ghost"
                 size="sm"
-                onClick={() => window.open("https://github.com/smshagor-dev/CoderPoint.git", "_blank")}
+                onClick={() => window.open("https://github.com/smshagor-dev", "_blank")}
               />
             </Tooltip>
             <Tooltip label={`Switch to ${colorMode === "light" ? "dark" : "light"} mode`} placement="bottom">
@@ -694,16 +694,44 @@ function App() {
         py={3}
         flexShrink={0}
       >
-        <HStack spacing={4} justify="space-between" align="center">
+        <HStack spacing={4} justify="space-between" align="center" w="100%">
+          {/* Left Section */}
           <VStack align="start" spacing={0}>
-            <Text fontSize="xs" fontWeight="bold" letterSpacing="wide" color={colorMode === 'dark' ? 'purple.300' : 'purple.600'}>
+            <Text
+              fontSize="xs"
+              fontWeight="bold"
+              letterSpacing="wide"
+              color={colorMode === 'dark' ? 'purple.300' : 'purple.600'}
+            >
               QUICK START TEMPLATES
             </Text>
             <Text fontSize="xs" color={colorMode === 'dark' ? 'gray.400' : 'gray.600'}>
               Load example code to get started quickly
             </Text>
           </VStack>
-          
+
+          {/* Center Section */}
+          <VStack spacing={0} align="center">
+            <Text
+              fontSize="xs"
+              color={colorMode === 'dark' ? 'gray.500' : 'gray.700'}
+              textAlign="center"
+            >
+              © {new Date().getFullYear()} Design & Develop by{' '}
+              <Text
+                as="a"
+                href="https://smshagor.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                color={colorMode === 'dark' ? 'purple.300' : 'purple.600'}
+                fontWeight="medium"
+              >
+                Shahanur Islam Shagor
+              </Text>
+            </Text>
+          </VStack>
+
+          {/* Right Section */}
           <HStack spacing={3}>
             <Button
               size="sm"
@@ -712,15 +740,18 @@ function App() {
               colorScheme="orange"
               onClick={() => loadSnippet('html')}
               _hover={{
-                bg: colorMode === 'dark' ? 'rgba(249, 146, 38, 0.15)' : 'rgba(249, 146, 38, 0.08)',
+                bg:
+                  colorMode === 'dark'
+                    ? 'rgba(249, 146, 38, 0.15)'
+                    : 'rgba(249, 146, 38, 0.08)',
                 transform: 'translateY(-2px)',
-                boxShadow: '0 4px 12px rgba(249, 146, 38, 0.4)'
+                boxShadow: '0 4px 12px rgba(249, 146, 38, 0.4)',
               }}
               transition="all 0.2s"
             >
               HTML Template
             </Button>
-            
+
             <Button
               size="sm"
               leftIcon={<FaCode />}
@@ -728,9 +759,12 @@ function App() {
               colorScheme="blue"
               onClick={() => loadSnippet('javascript')}
               _hover={{
-                bg: colorMode === 'dark' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.08)',
+                bg:
+                  colorMode === 'dark'
+                    ? 'rgba(59, 130, 246, 0.15)'
+                    : 'rgba(59, 130, 246, 0.08)',
                 transform: 'translateY(-2px)',
-                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)'
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)',
               }}
               transition="all 0.2s"
             >
@@ -738,6 +772,7 @@ function App() {
             </Button>
           </HStack>
         </HStack>
+
       </Box>
     </Flex>
   );

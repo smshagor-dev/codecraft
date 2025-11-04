@@ -6,151 +6,254 @@ export const COMPILER_SYSTEM = {
     priority: 1,
     languages: ['python'],
     timeout: 30000,
-    features: ['file_processing', 'virtual_env', 'package_management']
-  },
-
-  codex: {
-    name: 'Codex API',
-    api: 'https://api.codex.jaagrav.in',
-    method: 'POST',
-    priority: 2,
-    languages: ['python', 'javascript', 'java', 'cpp', 'c', 'php', 'ruby', 'go', 'rust', 'swift'],
-    timeout: 15000
+    features: ['file_processing', 'virtual_env', 'package_management', 'file_reading'],
+    fileSupport: {
+      txt: { read: true, write: true },
+      csv: { read: true, write: true, parse: true },
+      json: { read: true, write: true, parse: true },
+      xlsx: { read: true, write: false },
+      xls: { read: true, write: false },
+      xml: { read: true, write: true },
+      pdf: { read: false, write: false }
+    },
+    pythonConfig: {
+      version: '3.9',
+      defaultPackages: ['numpy', 'pandas', 'matplotlib', 'requests', 'scipy', 'sklearn', 'openpyxl'],
+      fileReadingPackages: ['pandas', 'openpyxl', 'json', 'csv'],
+      virtualEnv: true,
+      timeout: 30
+    }
   },
   piston: {
     name: 'Piston API',
     api: 'https://emkc.org/api/v2/piston/execute',
     method: 'POST',
-    priority: 3,
-    languages: ['python', 'javascript', 'java', 'cpp', 'c', 'rust', 'go', 'csharp', 'php', 'ruby', 'swift', 'kotlin'],
-    timeout: 10000
-  },
-  paiza: {
-    name: 'Paiza.IO',
-    api: 'https://api.paiza.io',
-    method: 'POST',
-    priority: 4,
-    languages: ['python', 'javascript', 'java', 'cpp', 'c', 'php', 'ruby', 'go', 'rust', 'swift'],
-    timeout: 20000
-  },
-  jdoodle: {
-    name: 'JDoodle API',
-    api: 'https://api.jdoodle.com/v1/execute',
-    method: 'POST',
-    priority: 5,
-    languages: ['python', 'javascript', 'java', 'cpp', 'c', 'csharp', 'php', 'ruby', 'go', 'rust', 'swift', 'kotlin'],
+    priority: 2,
+    languages: ['javascript', 'java', 'cpp', 'c', 'rust', 'go', 'csharp', 'php', 'ruby', 'swift', 'kotlin'],
     timeout: 15000
   }
 };
 
-// Complete language mapping with version support
+// Enhanced language mapping with backend priority
 export const LANGUAGE_MAPPING = {
-  // Python
-  'py': {name: 'python', version: '3.x'},
-  'python': {name: 'python', version: '3.x'},
-  'python3': {name: 'python', version: '3.x'},
+  // Python - Always use backend only
+  'py': {name: 'python', version: '3.9', backend: true, piston: false},
+  'python': {name: 'python', version: '3.9', backend: true, piston: false},
+  'python3': {name: 'python', version: '3.9', backend: true, piston: false},
   
-  // JavaScript
-  'js': {name: 'javascript', version: 'node'},
-  'javascript': {name: 'javascript', version: 'node'},
-  'jsx': {name: 'javascript', version: 'node'},
-  'node': {name: 'javascript', version: 'node'},
-  'nodejs': {name: 'javascript', version: 'node'},
+  // JavaScript - Try backend first, then piston
+  'js': {name: 'javascript', version: 'node', backend: true, piston: true},
+  'javascript': {name: 'javascript', version: 'node', backend: true, piston: true},
+  'jsx': {name: 'javascript', version: 'node', backend: true, piston: true},
+  'node': {name: 'javascript', version: 'node', backend: true, piston: true},
+  'nodejs': {name: 'javascript', version: 'node', backend: true, piston: true},
   
-  // TypeScript
-  'ts': {name: 'typescript', version: 'latest'},
-  'typescript': {name: 'typescript', version: 'latest'},
-  'tsx': {name: 'typescript', version: 'latest'},
+  // Java - Try backend first, then piston
+  'java': {name: 'java', version: '11+', backend: true, piston: true},
   
-  // Java
-  'java': {name: 'java', version: '11+'},
+  // C/C++ - Use piston only
+  'cpp': {name: 'cpp', version: 'c++17', backend: false, piston: true},
+  'c++': {name: 'cpp', version: 'c++17', backend: false, piston: true},
+  'cc': {name: 'cpp', version: 'c++17', backend: false, piston: true},
+  'cxx': {name: 'cpp', version: 'c++17', backend: false, piston: true},
+  'c': {name: 'c', version: 'c11', backend: false, piston: true},
   
-  // C/C++
-  'cpp': {name: 'cpp', version: 'c++17'},
-  'c++': {name: 'cpp', version: 'c++17'},
-  'cc': {name: 'cpp', version: 'c++17'},
-  'cxx': {name: 'cpp', version: 'c++17'},
-  'c': {name: 'c', version: 'c11'},
+  // C# - Use piston only
+  'cs': {name: 'csharp', version: 'latest', backend: false, piston: true},
+  'csharp': {name: 'csharp', version: 'latest', backend: false, piston: true},
+  'c#': {name: 'csharp', version: 'latest', backend: false, piston: true},
   
-  // C#
-  'cs': {name: 'csharp', version: 'latest'},
-  'csharp': {name: 'csharp', version: 'latest'},
-  'c#': {name: 'csharp', version: 'latest'},
+  // PHP - Use piston only
+  'php': {name: 'php', version: '7.4+', backend: false, piston: true},
   
-  // PHP
-  'php': {name: 'php', version: '7.4+'},
+  // Ruby - Use piston only
+  'rb': {name: 'ruby', version: 'latest', backend: false, piston: true},
+  'ruby': {name: 'ruby', version: 'latest', backend: false, piston: true},
   
-  // Ruby
-  'rb': {name: 'ruby', version: 'latest'},
-  'ruby': {name: 'ruby', version: 'latest'},
+  // Go - Use piston only
+  'go': {name: 'go', version: 'latest', backend: false, piston: true},
+  'golang': {name: 'go', version: 'latest', backend: false, piston: true},
   
-  // Go
-  'go': {name: 'go', version: 'latest'},
-  'golang': {name: 'go', version: 'latest'},
+  // Rust - Use piston only
+  'rs': {name: 'rust', version: 'latest', backend: false, piston: true},
+  'rust': {name: 'rust', version: 'latest', backend: false, piston: true},
   
-  // Rust
-  'rs': {name: 'rust', version: 'latest'},
-  'rust': {name: 'rust', version: 'latest'},
+  // Swift - Use piston only
+  'swift': {name: 'swift', version: 'latest', backend: false, piston: true},
   
-  // Swift
-  'swift': {name: 'swift', version: 'latest'},
+  // Kotlin - Use piston only
+  'kt': {name: 'kotlin', version: 'latest', backend: false, piston: true},
+  'kotlin': {name: 'kotlin', version: 'latest', backend: false, piston: true},
   
-  // Kotlin
-  'kt': {name: 'kotlin', version: 'latest'},
-  'kotlin': {name: 'kotlin', version: 'latest'},
-  
-  // Shell
-  'sh': {name: 'shell', version: 'bash'},
-  'bash': {name: 'shell', version: 'bash'},
-  'shell': {name: 'shell', version: 'bash'},
-  'zsh': {name: 'shell', version: 'zsh'},
-  
-  // Web & Data
-  'html': {name: 'html', version: '5'},
-  'htm': {name: 'html', version: '5'},
-  'css': {name: 'css', version: '3'},
-  'json': {name: 'json', version: 'n/a'},
-  'sql': {name: 'sql', version: 'standard'},
-  'xml': {name: 'xml', version: '1.0'}
+  // Shell - Use piston only
+  'sh': {name: 'shell', version: 'bash', backend: false, piston: true},
+  'bash': {name: 'shell', version: 'bash', backend: false, piston: true},
+  'shell': {name: 'shell', version: 'bash', backend: false, piston: true},
+  'zsh': {name: 'shell', version: 'zsh', backend: false, piston: true}
 };
 
-// File type detection with MIME types
+// Enhanced file type detection with Python backend support
 export const FILE_TYPE_DETECTION = {
-  // Data files
-  'csv': {type: 'csv', mime: 'text/csv', parser: 'csv'},
-  'tsv': {type: 'csv', mime: 'text/tab-separated-values', parser: 'csv'},
+  // Text files
+  'txt': {type: 'text', mime: 'text/plain', parser: 'text', backend: true},
+  'text': {type: 'text', mime: 'text/plain', parser: 'text', backend: true},
+  'log': {type: 'text', mime: 'text/plain', parser: 'text', backend: true},
+  
+  // CSV files
+  'csv': {type: 'csv', mime: 'text/csv', parser: 'csv', backend: true},
+  'tsv': {type: 'csv', mime: 'text/tab-separated-values', parser: 'csv', backend: true},
   
   // Excel files
-  'xlsx': {type: 'excel', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', parser: 'excel'},
-  'xls': {type: 'excel', mime: 'application/vnd.ms-excel', parser: 'excel'},
-  'xlsm': {type: 'excel', mime: 'application/vnd.ms-excel.sheet.macroEnabled.12', parser: 'excel'},
-  'xlsb': {type: 'excel', mime: 'application/vnd.ms-excel.sheet.binary.macroEnabled.12', parser: 'excel'},
+  'xlsx': {type: 'excel', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', parser: 'excel', backend: true},
+  'xls': {type: 'excel', mime: 'application/vnd.ms-excel', parser: 'excel', backend: true},
+  'xlsm': {type: 'excel', mime: 'application/vnd.ms-excel.sheet.macroEnabled.12', parser: 'excel', backend: true},
   
-  // Text files
-  'txt': {type: 'text', mime: 'text/plain', parser: 'text'},
-  'text': {type: 'text', mime: 'text/plain', parser: 'text'},
-  'log': {type: 'text', mime: 'text/plain', parser: 'text'},
-  'md': {type: 'text', mime: 'text/markdown', parser: 'text'},
-  'markdown': {type: 'text', mime: 'text/markdown', parser: 'text'},
+  // JSON files
+  'json': {type: 'json', mime: 'application/json', parser: 'json', backend: true},
   
-  // Data formats
-  'json': {type: 'json', mime: 'application/json', parser: 'json'},
-  'xml': {type: 'xml', mime: 'application/xml', parser: 'xml'},
-  'yaml': {type: 'yaml', mime: 'application/x-yaml', parser: 'yaml'},
-  'yml': {type: 'yaml', mime: 'application/x-yaml', parser: 'yaml'},
+  // XML files
+  'xml': {type: 'xml', mime: 'application/xml', parser: 'xml', backend: true},
+  
+  // Data files
+  'yaml': {type: 'yaml', mime: 'application/x-yaml', parser: 'yaml', backend: true},
+  'yml': {type: 'yaml', mime: 'application/x-yaml', parser: 'yaml', backend: true},
   
   // Code files
-  'js': {type: 'javascript', mime: 'application/javascript', parser: 'code'},
-  'py': {type: 'python', mime: 'text/x-python', parser: 'code'},
-  'java': {type: 'java', mime: 'text/x-java', parser: 'code'},
-  'cpp': {type: 'cpp', mime: 'text/x-c++', parser: 'code'},
-  'c': {type: 'c', mime: 'text/x-c', parser: 'code'},
-  'php': {type: 'php', mime: 'application/x-php', parser: 'code'},
-  'rb': {type: 'ruby', mime: 'application/x-ruby', parser: 'code'},
-  'rs': {type: 'rust', mime: 'text/x-rust', parser: 'code'},
-  'go': {type: 'go', mime: 'text/x-go', parser: 'code'},
-  'html': {type: 'html', mime: 'text/html', parser: 'code'},
-  'css': {type: 'css', mime: 'text/css', parser: 'code'}
+  'py': {type: 'python', mime: 'text/x-python', parser: 'code', backend: true},
+  'js': {type: 'javascript', mime: 'application/javascript', parser: 'code', backend: true},
+  'java': {type: 'java', mime: 'text/x-java', parser: 'code', backend: true}
+};
+
+// Enhanced language detection utility
+export const detectLanguageFromCode = (code) => {
+  if (!code || typeof code !== 'string' || code.trim().length === 0) {
+    return 'python'; // default
+  }
+  
+  const trimmedCode = code.trim();
+  const firstLine = trimmedCode.split('\n')[0].trim().toLowerCase();
+  
+  // Detect from shebang
+  if (firstLine.startsWith('#!')) {
+    if (firstLine.includes('python')) return 'python';
+    if (firstLine.includes('node')) return 'javascript';
+    if (firstLine.includes('bash') || firstLine.includes('sh')) return 'shell';
+    if (firstLine.includes('php')) return 'php';
+    if (firstLine.includes('ruby')) return 'ruby';
+  }
+  
+  // Detect from class declarations (Java/C#)
+  if (trimmedCode.includes('public class') || trimmedCode.includes('class ') && trimmedCode.includes('{') && !trimmedCode.includes('def ')) {
+    if (trimmedCode.includes('System.') || trimmedCode.includes('import java.')) return 'java';
+    if (trimmedCode.includes('Console.') || trimmedCode.includes('using System')) return 'csharp';
+  }
+  
+  // Detect from function patterns
+  if (trimmedCode.includes('def ') && trimmedCode.includes(':')) return 'python';
+  if ((trimmedCode.includes('function') || trimmedCode.includes('const ') || trimmedCode.includes('let ') || trimmedCode.includes('var ')) && 
+      trimmedCode.includes('{') && trimmedCode.includes('}')) return 'javascript';
+  
+  // Detect from includes/imports
+  if (trimmedCode.includes('#include')) return 'cpp';
+  if (trimmedCode.includes('<?php')) return 'php';
+  if (trimmedCode.includes('package main') || trimmedCode.includes('import "fmt"')) return 'go';
+  if (trimmedCode.includes('fn main()')) return 'rust';
+  
+  // Detect from print statements
+  if (trimmedCode.includes('System.out.print')) return 'java';
+  if (trimmedCode.includes('cout <<')) return 'cpp';
+  if (trimmedCode.includes('printf(') || trimmedCode.includes('puts(')) return 'c';
+  if (trimmedCode.includes('console.log')) return 'javascript';
+  if (trimmedCode.includes('print(') && !trimmedCode.includes('System.out.print')) return 'python';
+  
+  return 'python'; // default fallback
+};
+
+// Enhanced code validation for language compatibility
+export const validateCodeForLanguage = (code, targetLanguage) => {
+  if (!code || code.trim().length === 0) {
+    return { valid: true, code: '', warning: null };
+  }
+
+  const trimmedCode = code.trim();
+  
+  // Language-specific syntax validation
+  const incompatiblePatterns = {
+    python: [
+      { pattern: /class\s+\w+\s*\{/, language: 'Java/C++', example: 'class MyClass {' },
+      { pattern: /public\s+class/, language: 'Java', example: 'public class Main' },
+      { pattern: /void\s+main/, language: 'Java/C/C++', example: 'void main()' },
+      { pattern: /System\.out\.print/, language: 'Java', example: 'System.out.println()' },
+      { pattern: /#include\s*<.*>/, language: 'C/C++', example: '#include <iostream>' },
+      { pattern: /using\s+namespace/, language: 'C++', example: 'using namespace std;' },
+      { pattern: /cout\s*<</, language: 'C++', example: 'cout << "hello";' },
+      { pattern: /printf\s*\(/, language: 'C', example: 'printf("hello");' },
+      { pattern: /<\?php/, language: 'PHP', example: '<?php echo "hello"; ?>' }
+    ],
+    java: [
+      { pattern: /def\s+\w+\s*\(.*\):/, language: 'Python', example: 'def my_function():' },
+      { pattern: /print\(.*\)/, language: 'Python', example: 'print("hello")' },
+      { pattern: /import\s+\w+$/, language: 'Python', example: 'import os' },
+      { pattern: /#include/, language: 'C/C++', example: '#include <stdio.h>' },
+      { pattern: /<\?php/, language: 'PHP', example: '<?php echo "hello"; ?>' }
+    ],
+    cpp: [
+      { pattern: /def\s+\w+\s*\(.*\):/, language: 'Python', example: 'def my_function():' },
+      { pattern: /class\s+\w+:/, language: 'Python', example: 'class MyClass:' },
+      { pattern: /print\(.*\)/, language: 'Python', example: 'print("hello")' },
+      { pattern: /System\.out\.print/, language: 'Java', example: 'System.out.println()' },
+      { pattern: /public\s+class/, language: 'Java', example: 'public class Main' }
+    ],
+    c: [
+      { pattern: /def\s+\w+\s*\(.*\):/, language: 'Python', example: 'def my_function():' },
+      { pattern: /class\s+\w+:/, language: 'Python', example: 'class MyClass:' },
+      { pattern: /print\(.*\)/, language: 'Python', example: 'print("hello")' },
+      { pattern: /System\.out\.print/, language: 'Java', example: 'System.out.println()' },
+      { pattern: /public\s+class/, language: 'Java', example: 'public class Main' },
+      { pattern: /cout\s*<</, language: 'C++', example: 'cout << "hello";' }
+    ],
+    javascript: [
+      { pattern: /def\s+\w+\s*\(.*\):/, language: 'Python', example: 'def my_function():' },
+      { pattern: /class\s+\w+\s*\{/, language: 'Java/C++', example: 'class MyClass {' },
+      { pattern: /public\s+class/, language: 'Java', example: 'public class Main' },
+      { pattern: /System\.out\.print/, language: 'Java', example: 'System.out.println()' },
+      { pattern: /#include/, language: 'C/C++', example: '#include <iostream>' }
+    ],
+    php: [
+      { pattern: /def\s+\w+\s*\(.*\):/, language: 'Python', example: 'def my_function():' },
+      { pattern: /class\s+\w+\s*\{/, language: 'Java/C++', example: 'class MyClass {' },
+      { pattern: /public\s+class/, language: 'Java', example: 'public class Main' },
+      { pattern: /System\.out\.print/, language: 'Java', example: 'System.out.println()' },
+      { pattern: /#include/, language: 'C/C++', example: '#include <iostream>' }
+    ]
+  };
+
+  const patterns = incompatiblePatterns[targetLanguage] || [];
+  const detectedIssues = [];
+
+  for (const { pattern, language, example } of patterns) {
+    if (pattern.test(trimmedCode)) {
+      detectedIssues.push({
+        language,
+        example,
+        pattern: pattern.source
+      });
+    }
+  }
+
+  if (detectedIssues.length > 0) {
+    const warning = `Found ${detectedIssues.length} incompatible syntax pattern${detectedIssues.length > 1 ? 's' : ''} from ${detectedIssues.map(issue => issue.language).join(', ')}`;
+    
+    return { 
+      valid: false, 
+      code: trimmedCode,
+      error: `Language mismatch: Code contains ${detectedIssues[0].language} syntax (e.g., "${detectedIssues[0].example}") but current language is ${targetLanguage}`,
+      warnings: detectedIssues,
+      details: detectedIssues
+    };
+  }
+  
+  return { valid: true, code: trimmedCode, warning: null };
 };
 
 // Enhanced execution result structure
@@ -166,10 +269,11 @@ class ExecutionResult {
     this.language = '';
     this.timestamp = new Date().toISOString();
     this.metadata = {};
+    this.filesProcessed = [];
   }
 }
 
-// Analyze input requirements from code
+// Enhanced input requirements analysis
 export const analyzeInputRequirements = (code, language) => {
   if (!code || typeof code !== 'string') {
     return [];
@@ -183,26 +287,22 @@ export const analyzeInputRequirements = (code, language) => {
     python: [
       { pattern: /input\s*\(/, type: 'text', description: 'Python input() function' },
       { pattern: /sys\.stdin/, type: 'text', description: 'System stdin' },
-      { pattern: /argparse/, type: 'command_line', description: 'Command line arguments' }
+      { pattern: /argparse/, type: 'command_line', description: 'Command line arguments' },
+      { pattern: /open\s*\(/, type: 'file', description: 'File reading operation' },
+      { pattern: /pandas\.read_/, type: 'file', description: 'Pandas file reading' },
+      { pattern: /with\s+open/, type: 'file', description: 'File context manager' }
     ],
     javascript: [
       { pattern: /prompt\s*\(/, type: 'text', description: 'Browser prompt' },
       { pattern: /readline\s*\(/, type: 'text', description: 'Node.js readline' },
-      { pattern: /process\.stdin/, type: 'text', description: 'Node.js stdin' }
+      { pattern: /process\.stdin/, type: 'text', description: 'Node.js stdin' },
+      { pattern: /fs\.readFile/, type: 'file', description: 'File system reading' }
     ],
     java: [
       { pattern: /Scanner\s*\(/, type: 'text', description: 'Java Scanner' },
       { pattern: /System\.in/, type: 'text', description: 'System input stream' },
-      { pattern: /BufferedReader/, type: 'text', description: 'Buffered reader' }
-    ],
-    cpp: [
-      { pattern: /cin\s*>>/, type: 'text', description: 'C++ cin' },
-      { pattern: /std::cin/, type: 'text', description: 'Standard cin' }
-    ],
-    c: [
-      { pattern: /scanf\s*\(/, type: 'text', description: 'C scanf' },
-      { pattern: /gets\s*\(/, type: 'text', description: 'C gets' },
-      { pattern: /fgets\s*\(/, type: 'text', description: 'C fgets' }
+      { pattern: /BufferedReader/, type: 'text', description: 'Buffered reader' },
+      { pattern: /FileReader/, type: 'file', description: 'File reading' }
     ]
   };
 
@@ -227,27 +327,11 @@ export const analyzeInputRequirements = (code, language) => {
     }
   });
 
-  // Fallback: If no specific patterns found but code looks like it needs input
-  if (inputFields.length === 0 && code.length > 100) {
-    // Check for common input-related comments
-    const inputComments = code.match(/(input|enter|user|stdin|read)/gi);
-    if (inputComments && inputComments.length > 2) {
-      inputFields.push({
-        id: 'input_general_1',
-        type: 'text',
-        label: 'General Input',
-        placeholder: 'Enter required input',
-        required: false
-      });
-    }
-  }
-
   return inputFields;
 };
 
 // Web code execution function
 export const executeWebCode = async (language, code, fileSystem) => {
-  // Simple web code execution simulation
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve({
@@ -260,7 +344,7 @@ export const executeWebCode = async (language, code, fileSystem) => {
   });
 };
 
-// Main execution function with intelligent API selection
+// OPTIMIZED: Main execution function with Python backend priority
 export const executeCode = async (language, code, input = '', fileContent = null, options = {}) => {
   const startTime = performance.now();
   
@@ -275,34 +359,81 @@ export const executeCode = async (language, code, input = '', fileContent = null
     const langInfo = mapLanguage(language);
     const preparedCode = prepareCodeForExecution(code, langInfo.name, options);
     
-    // Get available APIs for this language
-    const availableApis = getAvailableApis(langInfo.name);
-    
-    if (availableApis.length === 0) {
-      throw new Error(`No APIs available for language: ${langInfo.name}`);
+    console.log(`Executing ${langInfo.name} code with backend priority...`);
+
+    // STRATEGY: For Python - ONLY use backend, throw error if backend fails
+    if (langInfo.name === 'python') {
+      try {
+        console.log('Using CoderPoint Backend for Python (mandatory)');
+        const result = await executeWithBackendAPI(langInfo.name, preparedCode, input, fileContent, options);
+        const executionTime = performance.now() - startTime;
+        
+        return {
+          ...result,
+          executionTime: Math.round(executionTime),
+          language: langInfo.name,
+          languageVersion: langInfo.version,
+          timestamp: new Date().toISOString(),
+          codeSize: code.length,
+          inputSize: input.length,
+          apiUsed: 'backend',
+          backendUsed: true
+        };
+      } catch (backendError) {
+        console.error('Python backend execution failed:', backendError.message);
+        throw new Error(`Python execution failed: Backend API is required for Python. Error: ${backendError.message}`);
+      }
     }
-
-    // Execute with fallback strategy
-    const result = await executeWithFallbackStrategy(
-      langInfo.name, 
-      preparedCode, 
-      input, 
-      fileContent, 
-      availableApis, 
-      options
-    );
-
-    const executionTime = performance.now() - startTime;
     
-    return {
-      ...result,
-      executionTime: Math.round(executionTime),
-      language: langInfo.name,
-      languageVersion: langInfo.version,
-      timestamp: new Date().toISOString(),
-      codeSize: code.length,
-      inputSize: input.length
-    };
+    // STRATEGY: For JavaScript/Java - Try backend first, then piston
+    if (langInfo.backend) {
+      try {
+        console.log(`Trying CoderPoint Backend for ${langInfo.name}`);
+        const result = await executeWithBackendAPI(langInfo.name, preparedCode, input, fileContent, options);
+        const executionTime = performance.now() - startTime;
+        
+        return {
+          ...result,
+          executionTime: Math.round(executionTime),
+          language: langInfo.name,
+          languageVersion: langInfo.version,
+          timestamp: new Date().toISOString(),
+          codeSize: code.length,
+          inputSize: input.length,
+          apiUsed: 'backend',
+          backendUsed: true
+        };
+      } catch (backendError) {
+        console.warn(`Backend API failed for ${langInfo.name}, trying Piston:`, backendError.message);
+        // Continue to piston fallback
+      }
+    }
+    
+    // STRATEGY: For all other languages - Use Piston only
+    if (langInfo.piston) {
+      try {
+        console.log(`Using Piston API for ${langInfo.name}`);
+        const result = await executeWithPistonAPI(langInfo.name, preparedCode, input, options);
+        const executionTime = performance.now() - startTime;
+        
+        return {
+          ...result,
+          executionTime: Math.round(executionTime),
+          language: langInfo.name,
+          languageVersion: langInfo.version,
+          timestamp: new Date().toISOString(),
+          codeSize: code.length,
+          inputSize: input.length,
+          apiUsed: 'piston',
+          backendUsed: false
+        };
+      } catch (pistonError) {
+        console.error(`Piston API failed for ${langInfo.name}:`, pistonError.message);
+        throw new Error(`Execution failed: ${pistonError.message}`);
+      }
+    }
+    
+    throw new Error(`No supported API available for language: ${langInfo.name}`);
     
   } catch (error) {
     const executionTime = performance.now() - startTime;
@@ -318,59 +449,49 @@ export const executeCode = async (language, code, input = '', fileContent = null
   }
 };
 
-// Intelligent API selection with fallback
-const executeWithFallbackStrategy = async (language, code, input, fileContent, availableApis, options) => {
-  const errors = [];
-  
-  for (const apiConfig of availableApis) {
-    try {
-      console.log(`Trying ${apiConfig.name} for ${language}...`);
-      
-      let result;
-      if (apiConfig.name === 'CoderPoint Backend') {
-        result = await executeWithBackendAPI(language, code, input, fileContent, options);
-      } else {
-        result = await executeWithExternalAPI(apiConfig, language, code, input, options);
-      }
-      
-      console.log(`${apiConfig.name} execution successful`);
-      return {
-        ...result,
-        apiUsed: apiConfig.name.toLowerCase().replace(' ', '_'),
-        backendUsed: apiConfig.name === 'CoderPoint Backend'
-      };
-      
-    } catch (error) {
-      console.warn(`${apiConfig.name} failed:`, error.message);
-      errors.push(`${apiConfig.name}: ${error.message}`);
-      
-      // Add delay between retries to avoid rate limiting
-      if (availableApis.indexOf(apiConfig) < availableApis.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    }
-  }
-  
-  throw new Error(`All execution attempts failed:\n${errors.join('\n')}`);
-};
-
-// Enhanced backend API execution
+// ENHANCED: Backend API execution with file reading support for Python
 const executeWithBackendAPI = async (language, code, input = '', fileContent = null, options = {}) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), COMPILER_SYSTEM.backend.timeout);
 
   try {
+    // Prepare Python-specific optimizations with file reading support
+    let processedCode = code;
+    if (language === 'python') {
+      processedCode = optimizePythonCodeWithFileSupport(code, input, fileContent);
+    }
+
     const payload = {
-      code: code,
+      code: processedCode,
       language: language,
       input: input,
+      timeout: COMPILER_SYSTEM.backend.pythonConfig.timeout,
+      enableFileReading: true,
       ...options
     };
 
     // Add file content if provided
     if (fileContent) {
-      payload.fileContent = processFileContentForAPI(fileContent);
+      payload.fileContent = processFileContentForBackend(fileContent, language);
     }
+
+    // Add Python-specific configuration with file reading packages
+    if (language === 'python') {
+      payload.pythonConfig = {
+        ...COMPILER_SYSTEM.backend.pythonConfig,
+        fileReading: true,
+        supportedFileTypes: Object.keys(COMPILER_SYSTEM.backend.fileSupport)
+      };
+    }
+
+    console.log('Sending to backend API:', { 
+      language, 
+      codeLength: processedCode.length, 
+      hasInput: !!input,
+      hasFiles: !!fileContent,
+      fileTypes: fileContent ? Object.keys(fileContent) : [],
+      pythonOptimized: language === 'python'
+    });
 
     const response = await fetch(COMPILER_SYSTEM.backend.api, {
       method: 'POST',
@@ -378,296 +499,185 @@ const executeWithBackendAPI = async (language, code, input = '', fileContent = n
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
-      signal: controller.signal
+      signal: controller.signal,
+      credentials: 'include'
     });
 
     clearTimeout(timeout);
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
     }
 
     const result = await response.json();
     
-    if (result.success === false) {
-      throw new Error(result.error || 'Execution failed on server');
+    console.log('Backend API response:', result);
+
+    // Handle different response formats
+    if (result.success === false || result.error) {
+      throw new Error(result.error || result.message || 'Execution failed on server');
     }
 
     return {
       success: true,
-      output: result.output || '',
-      error: result.error || '',
-      exitCode: result.exit_code || 0,
+      output: result.output || result.stdout || '',
+      error: result.error || result.stderr || '',
+      exitCode: result.exit_code || result.exitCode || 0,
       memory: result.memory,
-      cpuTime: result.cpuTime,
+      cpuTime: result.cpuTime || result.execution_time,
       metadata: {
         venvUsed: result.venv_used || false,
-        executionTime: result.execution_time
+        executionTime: result.execution_time,
+        packagesUsed: result.packages_used || [],
+        filesProcessed: result.files_processed || []
       }
     };
   } catch (error) {
     clearTimeout(timeout);
     if (error.name === 'AbortError') {
-      throw new Error('Backend API timeout');
+      throw new Error('Backend API timeout - execution took too long');
     }
     throw new Error(`Backend API: ${error.message}`);
   }
 };
 
-// External API execution handler
-const executeWithExternalAPI = async (apiConfig, language, code, input, options) => {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), apiConfig.timeout);
-
-  try {
-    let response;
-    
-    switch (apiConfig.name) {
-      case 'Codex API':
-        response = await executeWithCodexAPI(language, code, input, options, controller);
-        break;
-      case 'Piston API':
-        response = await executeWithPistonAPI(language, code, input, options, controller);
-        break;
-      case 'Paiza.IO':
-        response = await executeWithPaizaAPI(language, code, input, options, controller);
-        break;
-      case 'JDoodle API':
-        response = await executeWithJDoodleAPI(language, code, input, options, controller);
-        break;
-      default:
-        throw new Error(`Unsupported API: ${apiConfig.name}`);
-    }
-
-    clearTimeout(timeout);
-    return response;
-  } catch (error) {
-    clearTimeout(timeout);
-    if (error.name === 'AbortError') {
-      throw new Error(`${apiConfig.name} timeout`);
-    }
-    throw error;
+// Python code optimization with file reading support
+const optimizePythonCodeWithFileSupport = (code, input, fileContent) => {
+  let optimizedCode = code;
+  
+  // Remove any existing wrapper if present
+  optimizedCode = optimizedCode.trim();
+  
+  // Check if code uses file operations
+  const usesFileOperations = 
+    code.includes('open(') || 
+    code.includes('pandas.read_') || 
+    code.includes('with open') ||
+    code.includes('pd.read_') ||
+    code.includes('openpyxl') ||
+    code.includes('.to_csv') ||
+    code.includes('.to_excel');
+  
+  // Add file reading imports if needed
+  if (usesFileOperations && !code.includes('import pandas') && code.includes('pandas')) {
+    optimizedCode = 'import pandas as pd\n' + optimizedCode;
   }
+  
+  if (usesFileOperations && !code.includes('import openpyxl') && code.includes('openpyxl')) {
+    optimizedCode = 'import openpyxl\n' + optimizedCode;
+  }
+  
+  // Handle simple expressions for immediate execution
+  const lines = optimizedCode.split('\n');
+  if (lines.length === 1) {
+    const singleLine = lines[0].trim();
+    
+    // If it's a simple expression without print, wrap it
+    if (!singleLine.startsWith('print') && 
+        !singleLine.startsWith('import') &&
+        !singleLine.startsWith('from') &&
+        !singleLine.startsWith('def ') &&
+        !singleLine.startsWith('class ') &&
+        !singleLine.startsWith('#') &&
+        !singleLine.includes('=') &&
+        singleLine.length > 0) {
+      optimizedCode = `print(${singleLine})`;
+    }
+  }
+  
+  return optimizedCode;
 };
 
-// Codex API Implementation
-const executeWithCodexAPI = async (language, code, input, options, controller) => {
-  const response = await fetch(COMPILER_SYSTEM.codex.api, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      code: code,
-      language: language,
-      input: input,
-      ...options
-    }),
-    signal: controller.signal
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
+// Enhanced file content processing for backend
+const processFileContentForBackend = (fileContent, language) => {
+  if (typeof fileContent === 'string') {
+    return {
+      content: fileContent,
+      type: 'text',
+      language: language
+    };
   }
-
-  const result = await response.json();
   
-  if (result.error) {
-    throw new Error(result.error);
+  if (Array.isArray(fileContent)) {
+    return fileContent.reduce((acc, file, index) => {
+      const fileInfo = detectFileInfo(file.name || `file${index}`);
+      acc[`file${index}`] = {
+        content: file.content || file,
+        name: file.name || `file${index}`,
+        type: fileInfo.type,
+        extension: fileInfo.extension,
+        supported: fileInfo.backend
+      };
+      return acc;
+    }, {});
   }
-
-  return {
-    success: true,
-    output: result.output || '',
-    error: result.error || '',
-    exitCode: 0
-  };
+  
+  if (typeof fileContent === 'object') {
+    return Object.entries(fileContent).reduce((acc, [key, value]) => {
+      const fileInfo = detectFileInfo(key);
+      acc[key] = {
+        content: value.content || value,
+        name: key,
+        type: fileInfo.type,
+        extension: fileInfo.extension,
+        supported: fileInfo.backend
+      };
+      return acc;
+    }, {});
+  }
+  
+  return fileContent;
 };
 
 // Piston API Implementation
-const executeWithPistonAPI = async (language, code, input, options, controller) => {
-  const response = await fetch(COMPILER_SYSTEM.piston.api, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      language: language,
-      version: '*',
-      files: [{ content: code }],
-      stdin: input,
-      ...options
-    }),
-    signal: controller.signal
-  });
+const executeWithPistonAPI = async (language, code, input, options) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), COMPILER_SYSTEM.piston.timeout);
 
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
+  try {
+    const response = await fetch(COMPILER_SYSTEM.piston.api, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        language: language,
+        version: '*',
+        files: [{ content: code }],
+        stdin: input,
+        ...options
+      }),
+      signal: controller.signal
+    });
 
-  const result = await response.json();
-  
-  if (result.message) {
-    throw new Error(result.message);
-  }
-
-  if (result.run) {
-    return {
-      success: true,
-      output: result.run.output || '',
-      error: result.run.stderr || '',
-      exitCode: result.run.code || 0
-    };
-  }
-
-  throw new Error('Unexpected response format');
-};
-
-// Paiza.IO API Implementation
-const executeWithPaizaAPI = async (language, code, input, options, controller) => {
-  const paizaLanguageMap = {
-    'python': 'python3',
-    'javascript': 'javascript',
-    'java': 'java',
-    'cpp': 'cpp',
-    'c': 'c',
-    'php': 'php',
-    'ruby': 'ruby',
-    'go': 'go',
-    'rust': 'rust',
-    'swift': 'swift'
-  };
-
-  const paizaLang = paizaLanguageMap[language];
-  if (!paizaLang) {
-    throw new Error(`Language ${language} not supported by Paiza`);
-  }
-
-  // Create runner session
-  const createResponse = await fetch(`${COMPILER_SYSTEM.paiza.api}/runners/create`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      source_code: code,
-      language: paizaLang,
-      input: input,
-      api_key: 'guest',
-      ...options
-    }),
-    signal: controller.signal
-  });
-
-  const createResult = await createResponse.json();
-  
-  if (createResult.error) {
-    throw new Error(createResult.error);
-  }
-
-  if (!createResult.id) {
-    throw new Error('Failed to create runner session');
-  }
-
-  // Poll for results
-  const pollStartTime = Date.now();
-  const pollTimeout = 30000;
-  
-  while (Date.now() - pollStartTime < pollTimeout) {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (controller.signal.aborted) {
-      throw new Error('Polling aborted');
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
     }
 
-    const statusResponse = await fetch(
-      `${COMPILER_SYSTEM.paiza.api}/runners/get_status?id=${createResult.id}&api_key=guest`,
-      { signal: controller.signal }
-    );
+    const result = await response.json();
     
-    const statusResult = await statusResponse.json();
-    
-    if (statusResult.status === 'completed') {
-      const detailsResponse = await fetch(
-        `${COMPILER_SYSTEM.paiza.api}/runners/get_details?id=${createResult.id}&api_key=guest`,
-        { signal: controller.signal }
-      );
-      
-      const details = await detailsResponse.json();
-      
+    if (result.message) {
+      throw new Error(result.message);
+    }
+
+    if (result.run) {
       return {
         success: true,
-        output: details.stdout || '',
-        error: details.stderr || details.build_stderr || '',
-        exitCode: details.exit_code || 0
+        output: result.run.output || '',
+        error: result.run.stderr || '',
+        exitCode: result.run.code || 0
       };
-    } else if (statusResult.status === 'error') {
-      throw new Error('Execution error in Paiza');
     }
+
+    throw new Error('Unexpected response format');
+  } catch (error) {
+    clearTimeout(timeout);
+    if (error.name === 'AbortError') {
+      throw new Error('Piston API timeout');
+    }
+    throw error;
   }
-
-  throw new Error('Paiza execution timeout');
-};
-
-// JDoodle API Implementation
-const executeWithJDoodleAPI = async (language, code, input, options, controller) => {
-  const jdoodleLanguageMap = {
-    'python': 'python3',
-    'javascript': 'nodejs',
-    'java': 'java',
-    'cpp': 'cpp',
-    'c': 'c',
-    'csharp': 'csharp',
-    'php': 'php',
-    'ruby': 'ruby',
-    'go': 'go',
-    'rust': 'rust',
-    'swift': 'swift',
-    'kotlin': 'kotlin'
-  };
-
-  const jdoodleLang = jdoodleLanguageMap[language];
-  if (!jdoodleLang) {
-    throw new Error(`Language ${language} not supported by JDoodle`);
-  }
-
-  const clientId = '9143123cdb6e8b72a552c3449ca7f7e7';
-  const clientSecret = 'e90b70abfc6ac26d36ad6e9c3b84ab334decc8b23b8443b270b171828801e3d3';
-  
-  const response = await fetch(COMPILER_SYSTEM.jdoodle.api, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      clientId: clientId,
-      clientSecret: clientSecret,
-      script: code,
-      language: jdoodleLang,
-      versionIndex: '0',
-      stdin: input,
-      ...options
-    }),
-    signal: controller.signal
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-
-  const result = await response.json();
-  
-  if (result.error) {
-    throw new Error(result.error);
-  }
-
-  return {
-    success: true,
-    output: result.output || '',
-    error: result.error || '',
-    memory: result.memory,
-    cpuTime: result.cpuTime
-  };
 };
 
 // Utility functions
@@ -709,17 +719,15 @@ const mapLanguage = (language) => {
   return mapped;
 };
 
-const getAvailableApis = (language) => {
-  return Object.values(COMPILER_SYSTEM)
-    .filter(api => api.languages.includes(language))
-    .sort((a, b) => a.priority - b.priority);
-};
-
 const prepareCodeForExecution = (code, language, options) => {
   let preparedCode = code;
   
   // Apply language-specific formatting
   switch (language) {
+    case 'python':
+      // Python code is handled by optimizePythonCodeWithFileSupport function
+      break;
+      
     case 'java':
       if (!code.includes('public class') && !code.includes('class')) {
         preparedCode = `public class Main {\n    public static void main(String[] args) {\n        ${code}\n    }\n}`;
@@ -737,34 +745,18 @@ const prepareCodeForExecution = (code, language, options) => {
         preparedCode = `#include <iostream>\nusing namespace std;\n\nint main() {\n    ${code}\n    return 0;\n}`;
       }
       break;
+
+    case 'php':
+      if (!code.includes('<?php') && !code.trim().startsWith('<?')) {
+        preparedCode = `<?php\n${code}\n?>`;
+      }
+      break;
   }
   
   return preparedCode;
 };
 
-const processFileContentForAPI = (fileContent) => {
-  if (typeof fileContent === 'string') {
-    return fileContent;
-  }
-  
-  if (Array.isArray(fileContent)) {
-    return fileContent.reduce((acc, file, index) => {
-      acc[`file${index}`] = file.content || file;
-      return acc;
-    }, {});
-  }
-  
-  if (typeof fileContent === 'object') {
-    return Object.entries(fileContent).reduce((acc, [key, value]) => {
-      acc[key] = value.content || value;
-      return acc;
-    }, {});
-  }
-  
-  return fileContent;
-};
-
-// File processing functions
+// FILE PROCESSING FUNCTIONS
 export const readFileContent = async (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -781,17 +773,19 @@ export const readFileContent = async (file) => {
         lastModified: file.lastModified,
         content: content,
         extension: file.name.split('.').pop().toLowerCase(),
+        backendSupported: fileInfo.backend || false,
         parsedData: parseFileContent(content, fileInfo)
       });
     };
     
     reader.onerror = (error) => reject(error);
     
-    // Determine reading strategy
+    // Determine reading strategy based on file type
     if (file.type.startsWith('text/') || 
         file.type === 'application/json' ||
-        file.type === 'application/csv' ||
-        fileInfo.type === 'text') {
+        file.type.includes('csv') ||
+        fileInfo.type === 'text' ||
+        fileInfo.backend) {
       reader.readAsText(file);
     } else {
       reader.readAsDataURL(file);
@@ -801,11 +795,17 @@ export const readFileContent = async (file) => {
 
 export const detectFileInfo = (filename, mimeType = '') => {
   const extension = filename.split('.').pop().toLowerCase();
-  return FILE_TYPE_DETECTION[extension] || { 
+  const fileType = FILE_TYPE_DETECTION[extension] || { 
     type: 'unknown', 
     mime: mimeType || 'application/octet-stream',
-    parser: 'raw'
+    parser: 'raw',
+    backend: false
   };
+  
+  // Check if file type is supported by backend
+  fileType.backendSupported = COMPILER_SYSTEM.backend.fileSupport[extension] !== undefined;
+  
+  return fileType;
 };
 
 export const parseFileContent = (content, fileInfo) => {
@@ -824,6 +824,12 @@ export const parseFileContent = (content, fileInfo) => {
         };
       case 'xml':
         return parseXML(content);
+      case 'excel':
+        return {
+          type: 'excel',
+          content: content,
+          note: 'Excel files are processed by backend Python with pandas'
+        };
       default:
         return content;
     }
@@ -862,20 +868,26 @@ const parseCSV = (content) => {
 };
 
 const parseXML = (content) => {
-  // Simple XML parsing - for complex XML use DOMParser
   try {
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(content, "text/xml");
-    
-    if (xmlDoc.getElementsByTagName("parsererror").length > 0) {
-      throw new Error('XML parsing error');
+    if (typeof window !== 'undefined' && window.DOMParser) {
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(content, "text/xml");
+      
+      if (xmlDoc.getElementsByTagName("parsererror").length > 0) {
+        throw new Error('XML parsing error');
+      }
+      
+      return {
+        root: xmlDoc.documentElement.nodeName,
+        valid: true,
+        content: content
+      };
+    } else {
+      return {
+        valid: content.includes('<?xml'),
+        content: content
+      };
     }
-    
-    return {
-      root: xmlDoc.documentElement.nodeName,
-      valid: true,
-      content: content
-    };
   } catch (error) {
     return {
       valid: false,
@@ -885,7 +897,49 @@ const parseXML = (content) => {
   }
 };
 
-// Enhanced compiler class
+// Python file reading utilities
+export const generatePythonFileReadingCode = (fileData, operation = 'read') => {
+  const fileExtensions = Object.keys(fileData);
+  let pythonCode = '';
+  
+  fileExtensions.forEach(ext => {
+    const files = fileData[ext];
+    files.forEach((file, index) => {
+      switch (ext) {
+        case 'csv':
+          pythonCode += `# Reading CSV file: ${file.name}\n`;
+          pythonCode += `df_${index} = pd.read_csv('${file.name}')\n`;
+          pythonCode += `print(f"CSV file ${file.name} loaded with {len(df_${index})} rows and {len(df_${index}.columns)} columns")\n`;
+          pythonCode += `print(df_${index}.head())\n\n`;
+          break;
+        case 'json':
+          pythonCode += `# Reading JSON file: ${file.name}\n`;
+          pythonCode += `with open('${file.name}', 'r') as f:\n`;
+          pythonCode += `    data_${index} = json.load(f)\n`;
+          pythonCode += `print(f"JSON file ${file.name} loaded")\n`;
+          pythonCode += `print(f"Data type: {type(data_${index})}")\n\n`;
+          break;
+        case 'txt':
+          pythonCode += `# Reading text file: ${file.name}\n`;
+          pythonCode += `with open('${file.name}', 'r') as f:\n`;
+          pythonCode += `    text_${index} = f.read()\n`;
+          pythonCode += `print(f"Text file ${file.name} loaded with {len(text_${index})} characters")\n\n`;
+          break;
+        case 'xlsx':
+        case 'xls':
+          pythonCode += `# Reading Excel file: ${file.name}\n`;
+          pythonCode += `df_${index} = pd.read_excel('${file.name}')\n`;
+          pythonCode += `print(f"Excel file ${file.name} loaded with {len(df_${index})} rows and {len(df_${index}.columns)} columns")\n`;
+          pythonCode += `print(df_${index}.head())\n\n`;
+          break;
+      }
+    });
+  });
+  
+  return pythonCode;
+};
+
+// Enhanced compiler class with Python file reading support
 export class EnhancedCompiler {
   constructor() {
     this.files = new Map();
@@ -894,7 +948,9 @@ export class EnhancedCompiler {
       maxHistorySize: 50,
       preferredAPI: 'auto',
       timeout: 30000,
-      autoFormat: true
+      autoFormat: true,
+      pythonOptimization: true,
+      enableFileReading: true
     };
   }
 
@@ -928,15 +984,27 @@ export class EnhancedCompiler {
     return Array.from(this.files.values());
   }
 
+  getFilesByType(type) {
+    return Array.from(this.files.values()).filter(file => file.type === type);
+  }
+
+  // Check if files are supported for Python backend
+  areFilesSupportedForPython() {
+    const files = Array.from(this.files.values());
+    return files.every(file => file.backendSupported);
+  }
+
   async execute(language, code, input = '', options = {}) {
     const fileContent = this.files.size > 0 ? 
       Object.fromEntries(Array.from(this.files.entries()).map(([name, file]) => [name, file])) : 
       null;
 
-    const result = await executeCode(language, code, input, fileContent, {
+    const executionOptions = {
       ...this.settings,
       ...options
-    });
+    };
+
+    const result = await executeCode(language, code, input, fileContent, executionOptions);
 
     // Add to history
     this.executionHistory.unshift({
@@ -946,6 +1014,7 @@ export class EnhancedCompiler {
       codeSize: code.length,
       inputSize: input.length,
       fileCount: this.files.size,
+      filesUsed: fileContent ? Object.keys(fileContent) : [],
       result
     });
 
@@ -972,144 +1041,33 @@ export class EnhancedCompiler {
   }
 
   getStats() {
+    const files = Array.from(this.files.values());
     return {
       totalExecutions: this.executionHistory.length,
       successfulExecutions: this.executionHistory.filter(e => e.result.success).length,
-      totalFiles: this.files.size,
-      fileTypes: Array.from(this.files.values()).reduce((acc, file) => {
+      totalFiles: files.length,
+      fileTypes: files.reduce((acc, file) => {
         acc[file.type] = (acc[file.type] || 0) + 1;
         return acc;
-      }, {})
+      }, {}),
+      pythonSupportedFiles: files.filter(f => f.backendSupported).length
     };
   }
 }
 
-// API status monitoring
-export const getAPIStatus = async () => {
-  const status = {};
-  const testPromises = [];
-
-  for (const [apiName, apiConfig] of Object.entries(COMPILER_SYSTEM)) {
-    testPromises.push(
-      testAPI(apiName, apiConfig).then(result => {
-        status[apiName] = result;
-      })
-    );
-  }
-
-  await Promise.allSettled(testPromises);
-  return status;
-};
-
-const testAPI = async (apiName, apiConfig) => {
-  const startTime = performance.now();
-  
-  try {
-    let testUrl = apiConfig.api;
-    
-    // Adjust test URL based on API
-    if (apiName === 'piston') {
-      testUrl = 'https://emkc.org/api/v2/piston/versions';
-    } else if (apiName === 'paiza') {
-      testUrl = `${apiConfig.api}/runners/create`;
-    }
-    
-    const response = await fetch(testUrl, {
-      method: apiName === 'piston' ? 'GET' : 'HEAD',
-      signal: AbortSignal.timeout(5000)
-    });
-    
-    const responseTime = performance.now() - startTime;
-    
-    return {
-      status: response.ok ? 'online' : 'offline',
-      responseTime: Math.round(responseTime),
-      lastChecked: new Date().toISOString()
-    };
-  } catch (error) {
-    return {
-      status: 'offline',
-      responseTime: 0,
-      lastChecked: new Date().toISOString(),
-      error: error.message
-    };
-  }
-};
-
-// Language support utilities
-export const isLanguageSupported = (language) => {
-  const langKey = language.toLowerCase();
-  return !!LANGUAGE_MAPPING[langKey];
-};
-
-export const getSupportedLanguages = () => {
-  return Object.entries(LANGUAGE_MAPPING).reduce((acc, [key, value]) => {
-    if (!acc.find(item => item.name === value.name)) {
-      acc.push({ name: value.name, version: value.version, aliases: [key] });
-    } else {
-      const existing = acc.find(item => item.name === value.name);
-      existing.aliases.push(key);
-    }
-    return acc;
-  }, []);
-};
-
-export const getAPISupport = (language) => {
-  const langInfo = mapLanguage(language);
-  const support = {};
-  
-  Object.keys(COMPILER_SYSTEM).forEach(api => {
-    support[api] = COMPILER_SYSTEM[api].languages.includes(langInfo.name);
-  });
-  
-  return support;
-};
-
-// Batch execution
-export const executeBatch = async (executions) => {
-  const results = [];
-  
-  for (const execution of executions) {
-    try {
-      const result = await executeCode(
-        execution.language,
-        execution.code,
-        execution.input,
-        execution.fileContent,
-        execution.options
-      );
-      results.push({
-        ...execution,
-        success: true,
-        result
-      });
-    } catch (error) {
-      results.push({
-        ...execution,
-        success: false,
-        error: error.message
-      });
-    }
-  }
-  
-  return results;
-};
-
 // Export everything
 export default {
   executeCode,
-  executeBatch,
+  executeWebCode,
   readFileContent,
   detectFileInfo,
   parseFileContent,
-  isLanguageSupported,
-  getSupportedLanguages,
-  getAPISupport,
-  getAPIStatus,
+  generatePythonFileReadingCode,
   EnhancedCompiler,
   COMPILER_SYSTEM,
   LANGUAGE_MAPPING,
   FILE_TYPE_DETECTION,
   analyzeInputRequirements,
-  executeWebCode
+  detectLanguageFromCode,
+  validateCodeForLanguage
 };

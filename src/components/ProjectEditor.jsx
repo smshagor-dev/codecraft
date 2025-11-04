@@ -298,6 +298,68 @@ export const ProjectEditor = () => {
     }
   };
 
+  // Custom tab component to avoid nested buttons
+  const CustomTab = ({ file, isActive, onSelect, onClose }) => (
+    <Box
+      role="tab"
+      aria-selected={isActive}
+      aria-controls={`tabs-panel-${file.id}`}
+      id={`tabs-tab-${file.id}`}
+      tabIndex={isActive ? 0 : -1}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      px={3}
+      py={2}
+      cursor="pointer"
+      borderBottom="2px solid"
+      borderColor={isActive ? 'purple.500' : 'transparent'}
+      bg={isActive ? (colorMode === 'dark' ? 'gray.700' : 'gray.100') : 'transparent'}
+      _hover={{
+        bg: colorMode === 'dark' ? 'gray.700' : 'gray.50'
+      }}
+      display="flex"
+      alignItems="center"
+      justifyContent="space-between"
+      minW="120px"
+      maxW="200px"
+    >
+      <Text fontSize="sm" isTruncated flex={1} mr={2}>
+        {file.name}
+      </Text>
+      {openFiles.length > 1 && (
+        <Box
+          as="span"
+          onClick={onClose}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }
+          }}
+          tabIndex={0}
+          role="button"
+          aria-label="Close file"
+          p={1}
+          borderRadius="sm"
+          _hover={{
+            bg: colorMode === 'dark' ? 'gray.600' : 'gray.200'
+          }}
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+        >
+          <CloseIcon boxSize={2} />
+        </Box>
+      )}
+    </Box>
+  );
+
   return (
     <HStack h="100%" spacing={0} align="stretch" overflow="hidden">
       {/* File Explorer */}
@@ -340,36 +402,53 @@ export const ProjectEditor = () => {
         </Box>
 
         {openFiles.length > 0 ? (
-          <Tabs
-            index={openFiles.findIndex(f => f.id === activeFileId)}
-            onChange={(index) => setActiveFileId(openFiles[index]?.id)}
-            h="100%"
-            display="flex"
-            flexDirection="column"
-            flex={1}
-          >
-            <TabList>
-              {openFiles.map(file => (
-                <Tab key={file.id} pr={1}>
-                  <HStack spacing={1}>
-                    <Text fontSize="sm">{file.name}</Text>
-                    {openFiles.length > 1 && (
-                      <IconButton
-                        icon={<CloseIcon />}
-                        size="xs"
-                        variant="ghost"
-                        onClick={(e) => handleCloseFile(file.id, e)}
-                        aria-label="Close file"
-                      />
-                    )}
-                  </HStack>
-                </Tab>
+          <Box h="100%" display="flex" flexDirection="column" flex={1}>
+            {/* Custom Tab List */}
+            <Box
+              display="flex"
+              borderBottom="1px solid"
+              borderColor={colorMode === 'dark' ? 'gray.600' : 'gray.200'}
+              bg={colorMode === 'dark' ? 'gray.800' : 'white'}
+              overflowX="auto"
+              css={{
+                '&::-webkit-scrollbar': {
+                  height: '4px',
+                },
+                '&::-webkit-scrollbar-track': {
+                  background: 'transparent',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  background: colorMode === 'dark' ? '#4A5568' : '#CBD5E0',
+                  borderRadius: '2px',
+                },
+              }}
+            >
+              {openFiles.map((file, index) => (
+                <CustomTab
+                  key={file.id}
+                  file={file}
+                  isActive={file.id === activeFileId}
+                  onSelect={() => setActiveFileId(file.id)}
+                  onClose={(e) => handleCloseFile(file.id, e)}
+                />
               ))}
-            </TabList>
+            </Box>
 
-            <TabPanels flex={1}>
-              {openFiles.map(file => (
-                <TabPanel key={file.id} p={0} h="100%">
+            {/* Tab Panels */}
+            <Box flex={1} position="relative">
+              {openFiles.map((file) => (
+                <Box
+                  key={file.id}
+                  id={`tabs-panel-${file.id}`}
+                  role="tabpanel"
+                  aria-labelledby={`tabs-tab-${file.id}`}
+                  position="absolute"
+                  top={0}
+                  left={0}
+                  right={0}
+                  bottom={0}
+                  display={file.id === activeFileId ? 'block' : 'none'}
+                >
                   <Editor
                     language={file.language || 'html'}
                     theme={colorMode === 'dark' ? 'coderpoint-theme' : 'vs'}
@@ -378,10 +457,10 @@ export const ProjectEditor = () => {
                     onMount={handleEditorMount}
                     options={editorOptions}
                   />
-                </TabPanel>
+                </Box>
               ))}
-            </TabPanels>
-          </Tabs>
+            </Box>
+          </Box>
         ) : (
           <Box
             h="100%"
