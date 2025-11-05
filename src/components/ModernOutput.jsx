@@ -280,7 +280,6 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
         }));
       }
       
-      // Complete cleanup before switching language
       setOutput("");
       setError(null);
       setLogs([]);
@@ -288,56 +287,46 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
       setHasGraphicalData(false);
       setUserInput('');
       setCompilerStatus('ready');
-      setActiveTab(0); // Reset to Console tab
+      setActiveTab(0); 
       setLanguageWarning(null);
-      
-      // Check for code compatibility and handle automatic clearing
+
       const validation = validateCodeForLanguage(sourceCode, language);
       const detectedLanguage = detectLanguageFromCode(sourceCode);
-      
-      // If code is incompatible with new language, show warning and optionally clear
+
+      // Handle incompatible code during language switch
       if (!validation.valid && sourceCode.trim().length > 0) {
-        setLanguageWarning(validation.error);
-        
-        // Auto-clear if switching between completely different language families
+        // Define incompatible language pairs (simpler and broader)
         const incompatibleFamilies = {
-          python: ['java', 'cpp', 'c', 'csharp', 'javascript'],
-          java: ['python', 'cpp', 'c', 'javascript', 'php'],
-          cpp: ['python', 'java', 'javascript', 'php', 'ruby'],
-          javascript: ['python', 'java', 'cpp', 'c', 'csharp'],
-          php: ['python', 'java', 'cpp', 'c', 'javascript']
+          python: ['php', 'java', 'cpp', 'c', 'csharp', 'javascript'],
+          php: ['python', 'java', 'cpp', 'c', 'javascript'],
+          java: ['python', 'php', 'cpp', 'c', 'javascript'],
+          cpp: ['python', 'php', 'java', 'javascript'],
+          javascript: ['python', 'php', 'java', 'cpp']
         };
-        
+
         const fromFamily = incompatibleFamilies[previousLanguageRef.current] || [];
-        const shouldAutoClear = fromFamily.includes(language) && sourceCode.trim().length > 50;
-        
+        const shouldAutoClear = fromFamily.includes(language);
+
+        setCodeHistory(prev => ({
+          ...prev,
+          [previousLanguageRef.current]: sourceCode
+        }));
+
         if (shouldAutoClear) {
-          // Restore code from history if available for the new language
           const restoredCode = codeHistory[language] || '';
           setEditorCode(restoredCode);
-          
+          setLanguageWarning(null);
           setLogs(prev => [...prev, {
             id: Date.now(),
-            type: 'warning',
-            message: `🧹 Auto-cleared incompatible ${getLanguageDisplayName(previousLanguageRef.current)} code. ${restoredCode ? 'Restored previous ' + getLanguageDisplayName(language) + ' code.' : ''}`,
+            type: 'info',
+            message: `✅ Switched from ${getLanguageDisplayName(previousLanguageRef.current)} to ${getLanguageDisplayName(language)} successfully.`,
             timestamp: new Date().toLocaleTimeString()
           }]);
         } else {
-          setLogs(prev => [...prev, {
-            id: Date.now(),
-            type: 'warning',
-            message: `⚠️ Code may be incompatible with ${getLanguageDisplayName(language)}. Detected ${getLanguageDisplayName(detectedLanguage)} patterns.`,
-            timestamp: new Date().toLocaleTimeString()
-          }]);
-        }
-      } else if (sourceCode.trim().length > 0) {
-        // Restore code from history if available
-        const restoredCode = codeHistory[language] || sourceCode;
-        if (restoredCode !== sourceCode) {
-          setEditorCode(restoredCode);
+          setLanguageWarning(null);
         }
       }
-      
+
       // Add language change log
       setLogs(prev => [...prev, {
         id: Date.now(),
@@ -640,13 +629,13 @@ export const ModernOutput = ({ editorRef, language, fileSystem, onFileSelect, on
     const detectedInputFields = analyzeCodeForInput();
     
     if (detectedInputFields.length > 0) {
-      // Show input modal
       setInputFields(detectedInputFields);
       setPendingExecution({ turboMode, cleanedCode });
       onOpen();
     } else {
       // No input required, run directly
       executeCodeDirectly(turboMode, '', cleanedCode);
+      setActiveTab(1);
     }
   };
 

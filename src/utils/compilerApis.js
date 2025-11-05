@@ -4,7 +4,7 @@ export const COMPILER_SYSTEM = {
     api: 'https://cloud.coderpoint.ru/api/execute.php',
     method: 'POST',
     priority: 1,
-    languages: ['python'],
+    languages: ['python', 'cpp', 'c'],
     timeout: 30000,
     features: ['file_processing', 'virtual_env', 'package_management', 'file_reading'],
     fileSupport: {
@@ -330,19 +330,69 @@ export const analyzeInputRequirements = (code, language) => {
   return inputFields;
 };
 
-// Web code execution function
+
+// Web code execution function (enhanced for console output capture)
 export const executeWebCode = async (language, code, fileSystem) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        output: `Web ${language} code executed successfully`,
-        executionTime: 100,
-        language: language
-      });
-    }, 500);
-  });
+  const start = performance.now();
+  let logs = [];
+  const originalLog = console.log;
+  const originalError = console.error;
+
+  try {
+    // Capture console output
+    console.log = (...args) => {
+      const msg = args.map(a => 
+        typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)
+      ).join(' ');
+      logs.push(msg);
+      originalLog(...args);
+    };
+
+    console.error = (...args) => {
+      const msg = args.map(a => 
+        typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)
+      ).join(' ');
+      logs.push(`❌ ${msg}`);
+      originalError(...args);
+    };
+
+    // Execute safely inside async wrapper (supports Promises & async/await)
+    const wrappedCode = `(async () => {
+      try {
+        ${code}
+      } catch (err) {
+        console.error(err);
+      }
+    })();`;
+
+    eval(wrappedCode);
+
+    // Wait a bit to collect async logs (setTimeout, Promises)
+    await new Promise(res => setTimeout(res, 1200));
+
+    const end = performance.now();
+
+    return {
+      success: true,
+      output: logs.join('\n') || '✅ JavaScript executed (no console output)',
+      executionTime: Math.round(end - start),
+      language
+    };
+  } catch (err) {
+    return {
+      success: false,
+      output: logs.join('\n'),
+      error: err.message,
+      executionTime: Math.round(performance.now() - start),
+      language
+    };
+  } finally {
+    // Restore console
+    console.log = originalLog;
+    console.error = originalError;
+  }
 };
+
 
 // OPTIMIZED: Main execution function with Python backend priority
 export const executeCode = async (language, code, input = '', fileContent = null, options = {}) => {
